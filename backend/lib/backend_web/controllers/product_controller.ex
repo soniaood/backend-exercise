@@ -22,7 +22,7 @@ defmodule BackendWeb.ProductController do
   end
 
   # For Frontend - /products
-  def index_legacy(conn, _params) do
+  def index_prototype(conn, _params) do
     conn = put_resp_header(conn, "x-deprecated", "Use GET /api/products")
 
     # Same response format for compatibility
