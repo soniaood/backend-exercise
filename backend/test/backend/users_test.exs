@@ -98,7 +98,7 @@ defmodule Backend.UsersTest do
         })
 
       {:ok, product} =
-        Repo.insert(%Product{id: "product1", name: "Test Product", price: Decimal.new("10.00")})
+        Repo.insert(%Product{name: "product1", description: "Test Product", price: Decimal.new("10.00")})
 
       {:ok, order} =
         Repo.insert(%Backend.Orders.Order{user_id: user.id, total: Decimal.new("10.00")})
@@ -177,10 +177,10 @@ defmodule Backend.UsersTest do
         })
 
       {:ok, product1} =
-        Repo.insert(%Product{id: "product1", name: "Product 1", price: Decimal.new("10.00")})
+        Repo.insert(%Product{name: "product1", description: "Product 1", price: Decimal.new("10.00")})
 
       {:ok, product2} =
-        Repo.insert(%Product{id: "product2", name: "Product 2", price: Decimal.new("20.00")})
+        Repo.insert(%Product{name: "product2", description: "Product 2", price: Decimal.new("20.00")})
 
       {:ok, order1} =
         Repo.insert(%Backend.Orders.Order{user_id: user.id, total: Decimal.new("10.00")})
@@ -228,10 +228,10 @@ defmodule Backend.UsersTest do
         })
 
       {:ok, product1} =
-        Repo.insert(%Product{id: "product1", name: "Product 1", price: Decimal.new("10.00")})
+        Repo.insert(%Product{name: "product1", description: "Product 1", price: Decimal.new("10.00")})
 
       {:ok, product2} =
-        Repo.insert(%Product{id: "product2", name: "Product 2", price: Decimal.new("20.00")})
+        Repo.insert(%Product{name: "product2", description: "Product 2", price: Decimal.new("20.00")})
 
       %{user: user, product1: product1, product2: product2}
     end

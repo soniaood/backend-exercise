@@ -11,7 +11,7 @@ defmodule Backend.Users.UserProduct do
 
   schema "user_products" do
     belongs_to :user, Backend.Users.User
-    belongs_to :product, Backend.Products.Product, type: :string
+    belongs_to :product, Backend.Products.Product
     belongs_to :order, Backend.Orders.Order
 
     timestamps()

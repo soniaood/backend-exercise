@@ -6,10 +6,12 @@ defmodule Backend.Products.Product do
   use Ecto.Schema
   import Ecto.Changeset
 
-  @primary_key {:id, :string, autogenerate: false}
+  @primary_key {:id, :binary_id, autogenerate: true}
+  @foreign_key_type :binary_id
 
   schema "products" do
     field :name, :string
+    field :description, :string
     field :price, :decimal
 
     has_many :order_items, Backend.Orders.OrderItem
@@ -20,8 +22,9 @@ defmodule Backend.Products.Product do
 
   def changeset(product, attrs) do
     product
-    |> cast(attrs, [:id, :name, :price])
-    |> validate_required([:id, :name, :price])
+    |> cast(attrs, [:name, :description, :price])
+    |> validate_required([:name, :description, :price])
     |> validate_number(:price, greater_than: 0)
+    |> unique_constraint(:name)
   end
 end

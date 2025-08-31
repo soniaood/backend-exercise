@@ -111,11 +111,11 @@ defmodule BackendWeb.AuthControllerTest do
         })
 
       # Create some products and a test order
-      create_test_products()
+      products = create_test_products()
 
       # Create a proper order first
-      {:ok, %{order: order}} = Backend.Orders.create_order(user.username, ["netflix"])
-      Users.add_user_products(user.id, ["spotify"], order.id)
+      {:ok, %{order: order}} = Backend.Orders.create_order(user.username, [products[0].id])
+      Users.add_user_products(user.id, [products[0].id], order.id)
 
       %{user: user}
     end
@@ -350,8 +350,8 @@ defmodule BackendWeb.AuthControllerTest do
     alias Backend.Repo
 
     products = [
-      %{id: "netflix", name: "Netflix", price: Decimal.new("75.99")},
-      %{id: "spotify", name: "Spotify", price: Decimal.new("45.99")}
+      %{id: Ecto.UUID.generate(), name: "netflix", desciption: "Netflix", price: Decimal.new("75.99")},
+      %{id: Ecto.UUID.generate(), name: "spotify", desciption: "Spotify", price: Decimal.new("45.99")}
     ]
 
     Enum.each(products, fn attrs ->

@@ -3,11 +3,26 @@ defmodule Backend.Orders do
   Orders context.
 
   Orchestrates order creation and validation within a single database transaction:
-  — Validates product existence and prevents re-purchase of already owned items
-  — Verifies user balance is enough and updates it
-  — Persists the `order`, its `order_items`, and user-product ownership
+  1. :user. Fetch user with products by id
+  2. :products. Validate all products exist
+  3. :validate_products. Check the user doesn't already own them
+  4. :validate_balance. Ensure the user has sufficient funds
+  5. :order. Create the order record
+  6. :order_items. Insert order items
+  7. :user_products. Record user ownership
+  8. :update_balance. Deduct from user balance
 
+  Dev notes:
   Also exposes read helpers to retrieve orders with their items and products.
+
+  Multi.run is part of Elixir's Ecto.Multi, which provides a way to compose multiple
+  database operations into a single atomic transaction.
+
+  Each Multi.run step:
+  — Executes a function that can access results from previous steps
+  — Must return {:ok, result} or {:error, reason}
+  — If any step fails, the entire transaction is rolled back
+  — Steps have access to accumulated results via the second parameter
   """
 
   import Ecto.Query
@@ -16,10 +31,13 @@ defmodule Backend.Orders do
   alias Backend.{Users, Products}
   alias Ecto.Multi
 
-  def create_order(user_username, product_ids) do
+  def create_order(user_id, product_ids) do
     Multi.new()
     |> Multi.run(:user, fn _repo, _changes ->
-      Users.get_user_by_username(user_username)
+      case Users.get_user_with_products(user_id) do
+        %Backend.Users.User{} = user -> {:ok, user}
+        nil -> {:error, :user_not_found}
+      end
     end)
     |> Multi.run(:products, fn _repo, _changes ->
       products = Products.get_products_by_ids(product_ids)
@@ -31,7 +49,7 @@ defmodule Backend.Orders do
       end
     end)
     |> Multi.run(:validate_products, fn _repo, %{user: user, products: products} ->
-      user_product_ids = Users.get_user_product_ids(user)
+      user_product_ids = Enum.map(user.user_products, & &1.product_id)
       already_purchased = Enum.filter(products, fn p -> p.id in user_product_ids end)
 
       if length(already_purchased) > 0 do

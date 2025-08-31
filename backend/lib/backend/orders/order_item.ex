@@ -13,7 +13,7 @@ defmodule Backend.Orders.OrderItem do
     field :price, :decimal
 
     belongs_to :order, Backend.Orders.Order
-    belongs_to :product, Backend.Products.Product, type: :string
+    belongs_to :product, Backend.Products.Product
 
     timestamps()
   end

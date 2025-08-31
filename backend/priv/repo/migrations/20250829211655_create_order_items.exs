@@ -5,7 +5,7 @@ defmodule Backend.Repo.Migrations.CreateOrderItems do
     create table(:order_items, primary_key: false) do
       add :id, :binary_id, primary_key: true
       add :order_id, references(:orders, type: :binary_id), null: false
-      add :product_id, references(:products, type: :string), null: false
+      add :product_id, references(:products, type: :binary_id), null: false
       add :price, :decimal, precision: 10, scale: 2, null: false
 
       timestamps()

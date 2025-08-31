@@ -9,7 +9,7 @@ defmodule Backend.Orders.OrderItemTest do
       attrs = %{
         price: Decimal.new("29.99"),
         order_id: "550e8400-e29b-41d4-a716-446655440000",
-        product_id: "netflix"
+        product_id: "550e8400-e29b-41d4-a716-446612345000"
       }
 
       changeset = OrderItem.changeset(%OrderItem{}, attrs)
@@ -17,7 +17,7 @@ defmodule Backend.Orders.OrderItemTest do
       assert changeset.valid?
       assert get_change(changeset, :price) == Decimal.new("29.99")
       assert get_change(changeset, :order_id) == "550e8400-e29b-41d4-a716-446655440000"
-      assert get_change(changeset, :product_id) == "netflix"
+      assert get_change(changeset, :product_id) == "550e8400-e29b-41d4-a716-446612345000"
     end
 
     test "accepts string price" do
@@ -341,10 +341,10 @@ defmodule Backend.Orders.OrderItemTest do
       assert product_assoc.related == Backend.Products.Product
     end
 
-    test "product association uses string type" do
+    test "product association uses binary_id type" do
       product_assoc = OrderItem.__schema__(:association, :product)
-      # Check that the product_id field type matches the product's string type
-      assert OrderItem.__schema__(:type, :product_id) == :string
+      # Check that the product_id field type matches the product's binary_id type
+      assert OrderItem.__schema__(:type, :product_id) == :binary_id
     end
   end
 
@@ -360,7 +360,7 @@ defmodule Backend.Orders.OrderItemTest do
     test "has correct field types" do
       assert OrderItem.__schema__(:type, :price) == :decimal
       assert OrderItem.__schema__(:type, :order_id) == :binary_id
-      assert OrderItem.__schema__(:type, :product_id) == :string
+      assert OrderItem.__schema__(:type, :product_id) == :binary_id
     end
 
     test "includes timestamps" do
@@ -374,12 +374,11 @@ defmodule Backend.Orders.OrderItemTest do
     end
 
     test "foreign key type configuration" do
-      # Most foreign keys use binary_id, but product_id uses string
+      # All foreign keys use binary_id
       order_assoc = OrderItem.__schema__(:association, :order)
       assert order_assoc.owner_key == :order_id
 
-      # product_id is explicitly defined as string type in the schema
-      assert OrderItem.__schema__(:type, :product_id) == :string
+      assert OrderItem.__schema__(:type, :product_id) == :binary_id
     end
   end
 

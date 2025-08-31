@@ -23,6 +23,23 @@ defmodule Backend.Products do
     Repo.all(query)
   end
 
+  @doc """
+  Get products by name (e.g., "netflix", "spotify").
+  For Frontend prototype endpoint compatibility
+  """
+  def get_products_by_names(product_names) do
+    query = from p in Product, where: p.name in ^product_names
+    Repo.all(query)
+  end
+
+  @doc """
+  Get a single product by its name identifier.
+  For Frontend prototype endpoint compatibility
+  """
+  def get_product_by_name(product_name) do
+    Repo.get_by(Product, name: product_name)
+  end
+
   def create_product(attrs) do
     %Product{}
     |> Product.changeset(attrs)

@@ -8,9 +8,7 @@ defmodule BackendWeb.ProductControllerTest do
     test "returns empty list when no products exist", %{conn: conn} do
       conn = get(conn, ~p"/api/products")
 
-      assert %{
-               "products" => []
-             } = json_response(conn, 200)
+      assert [] = json_response(conn, 200)
     end
 
     test "returns list of products", %{conn: conn} do
@@ -19,9 +17,7 @@ defmodule BackendWeb.ProductControllerTest do
 
       conn = get(conn, ~p"/api/products")
 
-      assert %{
-               "products" => products
-             } = json_response(conn, 200)
+      products = json_response(conn, 200)
 
       assert length(products) == 3
 
@@ -30,11 +26,13 @@ defmodule BackendWeb.ProductControllerTest do
         assert %{
                  "id" => _id,
                  "name" => _name,
+                 "description" => _description,
                  "price" => _price
                } = product
 
-        assert is_binary(product["id"])
-        assert is_binary(product["name"])
+        assert is_binary(product["id"])  # UUID
+        assert is_binary(product["name"])  # identifier
+        assert is_binary(product["description"])  # display name
         # Price should be a string representation of decimal
         assert is_binary(product["price"]) or is_number(product["price"])
       end)
@@ -189,8 +187,8 @@ defmodule BackendWeb.ProductControllerTest do
     test "product fields are correctly formatted", %{conn: conn} do
       {:ok, _product} =
         Products.create_product(%{
-          id: "formatting-test",
           name: "Format Test Product",
+          description: "A test product for format validation",
           price: Decimal.new("123.45")
         })
 
@@ -219,11 +217,11 @@ defmodule BackendWeb.ProductControllerTest do
     test "handles products with edge case values", %{conn: conn} do
       edge_cases = [
         # Very long name
-        %{id: "long-name", name: String.duplicate("A", 255), price: Decimal.new("0.01")},
+        %{name: String.duplicate("A", 255), description: "Long name product", price: Decimal.new("0.01")},
         # Very high price
-        %{id: "high-price", name: "Expensive", price: Decimal.new("99999.99")},
+        %{name: "Expensive", description: "Expensive product", price: Decimal.new("99999.99")},
         # Very low price (but not zero due to validation)
-        %{id: "cheap", name: "Cheap Product", price: Decimal.new("0.01")}
+        %{name: "Cheap Product", description: "Cheap product", price: Decimal.new("0.01")}
       ]
 
       Enum.each(edge_cases, fn product_data ->
@@ -254,8 +252,8 @@ defmodule BackendWeb.ProductControllerTest do
       # Create a product directly through the context
       {:ok, created_product} =
         Products.create_product(%{
-          id: "integration-test",
           name: "Integration Product",
+          description: "Integration test product",
           price: Decimal.new("50.00")
         })
 
@@ -273,9 +271,9 @@ defmodule BackendWeb.ProductControllerTest do
   # Helper function to create consistent test data
   defp create_test_products do
     products_data = [
-      %{id: "netflix", name: "Netflix Subscription", price: Decimal.new("75.99")},
-      %{id: "spotify", name: "Spotify Premium", price: Decimal.new("45.99")},
-      %{id: "gym", name: "Gym Membership", price: Decimal.new("120.00")}
+      %{name: "netflix", description: "Netflix Subscription", price: Decimal.new("75.99")},
+      %{name: "spotify", description: "Spotify Premium", price: Decimal.new("45.99")},
+      %{name: "gym", description: "Gym Membership", price: Decimal.new("120.00")}
     ]
 
     Enum.each(products_data, fn product_data ->

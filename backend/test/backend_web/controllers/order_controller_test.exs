@@ -3,7 +3,7 @@ defmodule BackendWeb.OrderControllerTest do
 
   alias Backend.{Users, Guardian}
 
-  describe "POST /orders (legacy - no authentication)" do
+  describe "POST /orders (Frontend prototype - no authentication)" do
     setup do
       # Create user via legacy method
       {:ok, user} = Users.get_user_by_username("johndoe")
@@ -29,7 +29,7 @@ defmodule BackendWeb.OrderControllerTest do
                    "total" => total
                  }
                }
-             } = json_response(conn, 200)
+             } = json_response(conn<, 200)
 
       assert is_binary(order_id)
       assert is_list(items)
@@ -138,13 +138,11 @@ defmodule BackendWeb.OrderControllerTest do
         |> post(~p"/api/orders", order_params)
 
       assert %{
-               "order" => %{
-                 "id" => order_id,
-                 "user_id" => user_id,
-                 "items" => items,
-                 "total" => total,
-                 "created_at" => created_at
-               }
+               "id" => order_id,
+               "user_id" => user_id,
+               "items" => items,
+               "total" => total,
+               "created_at" => created_at
              } = json_response(conn, 200)
 
       assert is_binary(order_id)
@@ -155,9 +153,16 @@ defmodule BackendWeb.OrderControllerTest do
       assert total == "121.98"
 
       # Verify items contain expected products
-      product_ids = Enum.map(items, & &1["id"])
-      assert "netflix" in product_ids
-      assert "spotify" in product_ids
+      product_names = Enum.map(items, & &1["name"])
+      assert "netflix" in product_names
+      assert "spotify" in product_names
+      
+      Enum.each(items, fn item ->
+        assert is_binary(item["id"]) 
+        assert is_binary(item["name"])
+        assert is_binary(item["description"])
+        assert is_binary(item["price"])
+      end)
     end
 
     test "returns error for unauthenticated request", %{conn: conn} do
@@ -263,9 +268,9 @@ defmodule BackendWeb.OrderControllerTest do
     alias Backend.Repo
 
     products = [
-      %{id: "netflix", name: "Netflix", price: Decimal.new("75.99")},
-      %{id: "spotify", name: "Spotify", price: Decimal.new("45.99")},
-      %{id: "gym", name: "Gym Membership", price: Decimal.new("120.00")}
+      %{name: "netflix", description: "Netflix", price: Decimal.new("75.99")},
+      %{name: "spotify", description: "Spotify", price: Decimal.new("45.99")},
+      %{name: "gym", description: "Gym Membership", price: Decimal.new("120.00")}
     ]
 
     Enum.each(products, fn attrs ->
@@ -280,8 +285,8 @@ defmodule BackendWeb.OrderControllerTest do
     alias Backend.Repo
 
     products = [
-      %{id: "premium", name: "Premium Service", price: Decimal.new("500.00")},
-      %{id: "deluxe", name: "Deluxe Package", price: Decimal.new("600.00")}
+      %{name: "premium", description: "Premium Service", price: Decimal.new("500.00")},
+      %{name: "deluxe", description: "Deluxe Package", price: Decimal.new("600.00")}
     ]
 
     Enum.each(products, fn attrs ->

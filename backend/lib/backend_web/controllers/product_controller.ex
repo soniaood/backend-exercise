@@ -7,25 +7,33 @@ defmodule BackendWeb.ProductController do
   def index(conn, _params) do
     products = Products.list_products()
 
-    response = %{
-      products:
-        Enum.map(products, fn product ->
-          %{
-            id: product.id,
-            name: product.name,
-            price: product.price
-          }
-        end)
-    }
-
-    json(conn, response)
+    json(conn, Enum.map(products, fn product ->
+      %{
+        id: product.id,
+        name: product.name,
+        description: product.description,
+        price: product.price
+      }
+    end))
   end
 
   # For Frontend - /products
   def index_prototype(conn, _params) do
-    conn = put_resp_header(conn, "x-deprecated", "Use GET /api/products")
+    conn = put_resp_header(conn, "x-deprecated", "Use GET /api/products with API-Version: v1")
+    products = Products.list_products()
 
-    # Same response format for compatibility
-    index(conn, %{})
+    # Legacy response format for compatibility - show name as "id"
+    response = %{
+                        products:
+                                Enum.map(products, fn product ->
+      %{
+        id: product.name,  # Legacy: name field becomes "id" for compatibility
+        name: product.description,  # Legacy: description becomes display "name"
+        price: product.price
+      }
+    end)
+    }
+
+    json(conn, response)
   end
 end

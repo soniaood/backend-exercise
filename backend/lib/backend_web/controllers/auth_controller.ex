@@ -2,7 +2,7 @@ defmodule BackendWeb.AuthController do
   use BackendWeb, :controller
   alias Backend.{Users, Guardian}
 
-  def register(conn, %{"user" => user_params}) do
+  def register(conn, user_params) do
     case Users.register_user(user_params) do
       {:ok, user} ->
         {:ok, token, _claims} = Guardian.encode_and_sign(user)
@@ -10,11 +10,8 @@ defmodule BackendWeb.AuthController do
         conn
         |> put_status(:created)
         |> json(%{
-          user: %{
-            id: user.id,
-            username: user.username,
-            email: user.email
-          },
+          username: user.username,
+          email: user.email,
           token: token
         })
 
@@ -36,12 +33,10 @@ defmodule BackendWeb.AuthController do
         product_ids = Users.get_user_product_ids(user)
 
         json(conn, %{
-          user: %{
-            id: user.id,
-            username: user.username,
-            balance: user.balance,
-            product_ids: product_ids
-          },
+          username: user.username,
+          email: user.email,
+          balance: user.balance,
+          product_ids: product_ids,
           token: token
         })
 

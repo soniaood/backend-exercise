@@ -2,6 +2,381 @@
 
 A Phoenix/Elixir backend API for an application providing user register and authentication, product (benefits) fetching, and order (subscription) management capabilities.
 
+## System Design
+
+### Functional Requirements
+
+The system should support the following core functionalities:
+
+1. **User Management**
+   - User registration with email and password validation
+   - User authentication with JWT tokens
+   - User balance management with default starting balance
+
+2. **Product Management** 
+   - Product catalog with unique identifiers and pricing
+   - Product lookup by ID
+
+3. **Order Processing**
+   - Authenticated order creation with balance validation
+   - Duplicate purchase prevention (one product per user)
+   - Atomic transaction processing with automatic rollback
+   - Order history and item tracking
+
+4. **Legacy Support**
+   - Backward compatibility with the prototype frontend
+     - no authentication required
+     - create user on get when not found
+     - users are indexed and fetched by username
+     - preserve initial requirements responses
+     - support for legacy product identification by name
+
+
+### Non-Functional Requirements
+
+1. **Security**
+   - JWT-based authentication for sensitive operations
+   - Password hashing using bcrypt with secure salts
+   - SQL injection prevention via parameterized queries
+   - User authorization (users can only access own data)
+
+2. **Data Integrity**
+   - ACID transactions for order processing
+   - UUID-based primary keys for security
+   - Comprehensive input validation at all layers
+   - Referential integrity via foreign key constraints
+
+3. **Performance & Scalability**
+   - Database connection pooling
+   - Efficient query patterns with preloading
+   - Stateless authentication for horizontal scaling
+
+4. **Reliability**
+   - All-or-nothing order processing
+   - Database transaction rollback on failures
+   - Comprehensive error handling and logging
+
+### Key Assumptions
+
+1. **Business Logic**
+   - Single currency (EUR) with 2 decimal precision
+   - One-time purchases only
+   - Static product catalog (no dynamic creation supported)
+   - Default user balance of 1000.00 virtual currency
+
+2. **Technical**
+   - PostgreSQL as primary database
+   - Development environment uses Docker
+   - Single JWT secret (production should use key rotation)
+   - No user roles/permissions beyond basic authentication
+
+## Data Model
+
+```mermaid
+erDiagram
+    User {
+        uuid id PK
+        string username UK
+        string email UK
+        string password_hash
+        decimal balance
+        datetime inserted_at
+        datetime updated_at
+    }
+    
+    Product {
+        uuid id PK
+        string name UK
+        string description
+        decimal price
+        datetime inserted_at
+        datetime updated_at
+    }
+    
+    Order {
+        uuid id PK
+        uuid user_id FK
+        decimal total
+        datetime inserted_at
+        datetime updated_at
+    }
+    
+    OrderItem {
+        uuid id PK
+        uuid order_id FK
+        uuid product_id FK
+        decimal price
+        datetime inserted_at
+        datetime updated_at
+    }
+    
+    UserProduct {
+        uuid id PK
+        uuid user_id FK
+        uuid product_id FK
+        uuid order_id FK
+        datetime inserted_at
+        datetime updated_at
+    }
+    
+    User ||--o{ Order : "places"
+    Order ||--o{ OrderItem : "contains"
+    Product ||--o{ OrderItem : "included_in"
+    User ||--o{ UserProduct : "owns"
+    Product ||--o{ UserProduct : "owned_by"
+    Order ||--o{ UserProduct : "created_from"
+```
+
+## API Overview
+
+### Legacy Endpoints (Prototype Support)
+
+> ⚠️ **Deprecated**: These endpoints are maintained for frontend compatibility but have security and convention limitations.
+
+#### Get Products (Legacy)
+```http
+GET /api/products
+```
+
+**Response:**
+```json
+[
+  {
+    "id": "netflix",
+    "name": "Netflix Subscription", 
+    "price": "75.99"
+  }
+]
+```
+
+#### Get User by Username (Legacy)
+```http
+GET /api/users/{username}
+```
+
+**Response:**
+```json
+{
+  "user": {
+    "user_id": "john_doe",
+    "data": {
+      "balance": "1000.00",
+      "product_ids": ["netflix", "spotify"]
+    }
+  }
+}
+```
+
+#### Create Order (Legacy)
+```http
+POST /api/orders
+Content-Type: application/json
+
+{
+  "order": {
+    "items": ["netflix", "spotify"],
+    "user_id": "username_here"
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "order": {
+    "order_id": "456e7890-e12b-34c5-d678-901234567890",
+    "data": {
+      "items": [
+        {
+          "id": "netflix",
+          "name": "Netflix Subscription",
+          "price": "75.99"
+        }
+      ],
+      "total": "75.99"
+    }
+  }
+}
+```
+
+### Upgraded API Endpoints (V1)
+
+> **URL Versioning**: All upgraded endpoints use `/api/v1/` prefix
+
+#### Authentication
+
+**Register User**
+```http
+POST /api/v1/auth/register
+Content-Type: application/json
+
+{
+  "username": "john_doe",
+  "email": "john@example.com", 
+  "password": "SecurePass123!"
+}
+```
+
+**Response:**
+```json
+{
+  "username": "john_doe",
+  "email": "john@example.com",
+  "token": "eyJhbGciOiJIUzI1NiIs..."
+}
+```
+
+**Login User**
+```http
+POST /api/v1/auth/login
+Content-Type: application/json
+
+{
+  "username": "john_doe",
+  "password": "SecurePass123!"
+}
+```
+
+**Response:**
+```json
+{
+  "username": "john_doe",
+  "balance": "1000.00",
+  "email": "john@example.com",
+  "product_ids": ["550e8400-e29b-41d4-a716-446655440000"],
+  "token": "eyJhbGciOiJIUzI1NiIs..."
+}
+```
+
+#### Products
+
+**List Products**
+```http
+GET /api/v1/products
+```
+
+**Response:**
+```json
+[
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "name": "netflix",
+    "description": "Netflix Subscription", 
+    "price": "75.99"
+  }
+]
+```
+
+#### Orders
+
+**Create Order**
+```http
+POST /api/v1/orders
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "items": ["550e8400-e29b-41d4-a716-446655440000"]
+}
+```
+
+**Response:**
+```json
+{
+  "id": "456e7890-e12b-34c5-d678-901234567890",
+  "items": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "name": "netflix",
+      "description": "Netflix Subscription",
+      "price": "75.99"
+    }
+  ],
+  "total": "75.99",
+  "created_at": "2023-12-01T10:30:00Z"
+}
+```
+
+## System Architecture
+
+```mermaid
+graph TB
+    Client[Frontend Client]
+    Router[Phoenix Router]
+    Auth[Authentication Layer]
+    Controllers[Controllers]
+    Contexts[Business Logic Contexts]
+    Database[(PostgreSQL)]
+    
+    Client -->|HTTP/JSON| Router
+    Router --> Auth
+    Auth --> Controllers
+    Controllers --> Contexts
+    Contexts --> Database
+    
+    subgraph "Phoenix Application"
+        Router
+        Auth
+        Controllers
+        Contexts
+    end
+    
+    subgraph "Controllers Layer"
+        AuthController[Auth Controller]
+        ProductController[Product Controller] 
+        OrderController[Order Controller]
+        UserController[User Controller]
+    end
+    
+    subgraph "Business Contexts"
+        Users[Users Context]
+        Products[Products Context]
+        Orders[Orders Context]
+    end
+    
+    Controllers --> AuthController
+    Controllers --> ProductController
+    Controllers --> OrderController
+    Controllers --> UserController
+    
+    Contexts --> Users
+    Contexts --> Products
+    Contexts --> Orders
+    
+    Users --> Database
+    Products --> Database
+    Orders --> Database
+```
+
+## Transaction Flow
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant OrderController
+    participant OrdersContext
+    participant Database
+    
+    Client->>OrderController: POST /api/orders
+    OrderController->>OrdersContext: create_order(user_id, product_ids)
+    
+    OrdersContext->>Database: BEGIN TRANSACTION
+    OrdersContext->>Database: 1. Fetch user with products
+    OrdersContext->>Database: 2. Validate products exist
+    OrdersContext->>OrdersContext: 3. Check no duplicate purchases
+    OrdersContext->>OrdersContext: 4. Validate sufficient balance
+    OrdersContext->>Database: 5. Create order record
+    OrdersContext->>Database: 6. Insert order items
+    OrdersContext->>Database: 7. Record user ownership
+    OrdersContext->>Database: 8. Update user balance
+    OrdersContext->>Database: COMMIT TRANSACTION
+    
+    OrdersContext-->>OrderController: {:ok, order_data}
+    OrderController-->>Client: 200 OK with order details
+    
+    Note over OrdersContext,Database: If any step fails, entire transaction rolls back
+```
+
 ## Prerequisites
 
 - Elixir 1.15+
@@ -37,297 +412,47 @@ A Phoenix/Elixir backend API for an application providing user register and auth
 mix test
 ```
 
-## API Documentation
+## API Versioning Strategy
 
-## Frontend Compatibility Endpoints (Legacy)
+This API uses **URL-based versioning** to maintain backward compatibility:
 
-The following endpoints maintain compatibility with the existing frontend but have significant limitations:
+- **Legacy endpoints**: Use `/api/` prefix (for existing frontend compatibility)
+- **Upgraded endpoints**: Use `/api/v1/` prefix
 
-### Legacy Product Endpoint
-```http
-GET /products
-```
-
-**Limitations:**
-- No versioning in URL path
-- Inconsistent response structure compared to upgraded API
-- No authentication requirements
-
-### Legacy User Endpoint
-```http
-GET /users/{username}
-```
-
-**Limitations:**
-- Exposes user data without authentication
-- Creates users automatically if they don't exist (security risk)
-- Uses username instead of proper user ID
-- No validation of username format
-
-### Legacy Order Creation
-```http
-POST /orders
-Content-Type: application/json
-
-{
-  "order": {
-    "items": ["netflix", "spotify"],
-    "user_id": "username_here"
-  }
-}
-```
-
-**Major Limitations:**
-1. **Security Issues:**
-    - No authentication required
-    - User identification by username instead of secure token
-    - No authorization checks
-
-2. **Data Integrity Issues:**
-    - Users created automatically without proper validation
-    - No email requirement for user creation
-    - Weak user identification mechanism
-
-3. **API Design Issues:**
-    - Inconsistent with REST conventions
-    - Mixed responsibility (creates users and orders in single endpoint)
-    - No proper error handling for invalid users
-
-### Authentication Endpoints (Upgraded API)
-
-#### Register User
-```http
-POST /api/auth/register
-Content-Type: application/json
-
-{
-  "user": {
-    "username": "john_doe",
-    "email": "john@example.com", 
-    "password": "SecurePass123!"
-  }
-}
-```
-
-#### Login User
-```http
-POST /api/auth/login
-Content-Type: application/json
-
-{
-  "username": "john_doe",
-  "password": "SecurePass123!"
-}
-```
-
-**Response:**
-```json
-{
-  "user": {
-    "id": "123e4567-e89b-12d3-a456-426614174000",
-    "username": "john_doe",
-    "email": "john@example.com",
-    "balance": "1000.00"
-  },
-  "token": "eyJhbGciOiJIUzI1NiIs..."
-}
-```
-
-#### Refresh Token
-```http
-POST /api/auth/refresh
-Authorization: Bearer <token>
-```
-
-#### Logout
-```http
-POST /api/auth/logout  
-Authorization: Bearer <token>
-```
-
-### Product Endpoints
-
-#### List Products
-```http
-GET /api/products
-```
-
-**Response:**
-```json
-{
-  "products": [
-    {
-      "id": "netflix",
-      "name": "Netflix Subscription", 
-      "price": "15.99"
-    }
-  ]
-}
-```
-
-### User Endpoints (Authenticated)
-
-#### Get Current User
-```http
-GET /api/users/me
-Authorization: Bearer <token>
-```
-
-**Response:**
-```json
-{
-  "user": {
-    "id": "123e4567-e89b-12d3-a456-426614174000",
-    "username": "john_doe",
-    "email": "john@example.com",
-    "balance": "1000.00",
-    "product_ids": ["netflix", "spotify"]
-  }
-}
-```
-
-### Order Endpoints
-
-#### Create Order (Authenticated)
-```http
-POST /api/orders
-Authorization: Bearer <token>
-Content-Type: application/json
-
-{
-  "order": {
-    "items": ["netflix", "spotify"]
-  }
-}
-```
-
-**Response:**
-```json
-{
-  "order": {
-    "items": ["netflix", "spotify"]
-  }
-}
-```
-
-## Upgraded API Improvements
-
-The new authenticated API addresses the legacy issues:
-
-### Security Enhancements
-- **JWT Authentication:** All sensitive operations require Bearer token
-- **Proper User Registration:** Email and password validation with secure hashing
-- **Authorization:** Users can only access their own data
-- **CORS Protection:** Configured for frontend origin
-
-### Data Integrity  
-- **Validated User Creation:** Requires email, secure password, and username
-- **UUID-based IDs:** Secure, non-sequential user identification
-- **Transactional Operations:** Order creation with balance validation and rollback
-- **Schema Validation:** Comprehensive input validation at all levels
-
-### API Design
-- **Consistent URL Structure:** `/api/v1/*` pattern ready for versioning
-- **Proper HTTP Status Codes:** 200, 201, 400, 401, 403, 404, 422
-- **Standardized Error Responses:** Consistent error message format
-- **Resource Separation:** Clear endpoint responsibilities
-
-## Architecture
-
-### Database Schema
-- **Users:** UUID primary key, email/username uniqueness, hashed passwords
-- **Products:** String-based product IDs, decimal pricing
-- **Orders:** UUID-based with user association and total calculation
-- **Order Items:** Junction table with price snapshot
-- **User Products:** Many-to-many relationship tracking purchases
-
-### Business Logic
-- **User Balance Management:** 1000.00 default balance with transaction safety
-- **Duplicate Purchase Prevention:** Users cannot buy the same product twice
-- **Order Transaction Integrity:** All-or-nothing order processing with automatic rollback
-
-### Security Features
-- **Password Hashing:** Bcrypt with secure salts
-- **JWT Tokens:** Stateless authentication with configurable expiration
-- **Input Validation:** Comprehensive validation at controller and schema levels
-- **SQL Injection Protection:** Ecto parameterized queries
-
-## Assumptions Made
-
-1. **Single Currency:** All prices in EUR with 2 decimal precision
-2. **One-time Purchases:** Products are purchased once per user (no quantities)
-3. **Static Product Catalog:** Products are pre-seeded, no dynamic product creation
-4. **Simple User Roles:** No admin/customer distinction in current implementation
-5. **Default Balance:** New users start with 1000.00 virtual currency
-6**Development Environment:** Database runs in Docker for local development
-7**JWT Security:** Single secret key for token signing (should use rotation in production)
+**Routing Logic:**
+1. Requests to `/api/v1/` → Routes to upgraded endpoints with enhanced features
+2. Requests to `/api/` → Routes to legacy endpoints (prototype compatibility)
+3. Clear URL separation prevents routing conflicts
 
 ## API Conventions
 
-This backend exposes an authenticated API under `/api` and a small set of legacy endpoints (deprecated) for compatibility with the Frontend prototype UI.
-
-### Envelope style
-
-- Requests (write operations) are resource-wrapped:
-    - Example (create order, authenticated):
-      ```json
-      {
-        "order": {
-          "items": ["netflix", "spotify"]
-        }
-      }
-      ```
-- Responses are resource-rooted:
-    - Single resource: `{"user": {...}}`, `{"order": {...}}`
-    - Collections: `{"products": [...]}`
-
-Legacy endpoints preserve the original prototype contracts and may differ in naming (see “Legacy compatibility”).
-
-### Identifiers
-
-- IDs are opaque strings (UUID/ULID-like). Clients must treat them as strings and not infer meaning.
-- Upgraded user responses include both:
-    - `id` (opaque) for backend references
-    - `username` for display
-- Legacy `user_id` equals the username (string). Modern `user_id` fields (e.g., on orders) are opaque IDs.
+### Response Format
+- Upgraded endpoints return flat structures: `{"id": "...", "username": "..."}`
+- Legacy endpoints preserve prototype format with wrappers
 
 ### Authentication
+- Protected endpoints require: `Authorization: Bearer <token>`
+- Unauthenticated requests return 401 with error details
 
-- Upgrated protected endpoints require a Bearer JWT via `Authorization: Bearer <token>`.
-- On missing/invalid/expired token:
-  ```json
-  {
-    "error": "unauthenticated",
-    "message": "Authentication required"
-  }
-  ```
+### Error Handling
+```json
+{
+  "error": "error_code",
+  "message": "Human readable message"
+}
+```
 
-### Monetary values
+Common error codes:
+- `products_not_found`
+- `products_already_purchased` 
+- `insufficient_balance`
+- `unauthenticated`
+- `registration_failed`
 
-- All monetary values (e.g., `balance`, `price`, `total`) are serialized as strings for precision:
-    - `"1000.00"`, `"75.99"`, etc.
+### Monetary Values
+All monetary values are strings for precision: `"1000.00"`, `"75.99"`
 
-### Error format
-
-- Client errors follow:
-  ```json
-  {
-    "error": "<error_code>",
-    "message": "<human_readable_message>"
-  }
-  ```
-  
-- Common error codes:
-    - `products_not_found`
-    - `products_already_purchased`
-    - `insufficient_balance`
-    - `unauthenticated`
-    - `internal_server_error`
-
-### Legacy compatibility
-
-- Legacy endpoints are available without authentication and return the original prototype shapes.
-- They include an `X-Deprecated` header advising the modern alternative.
-- Differences:
-    - Legacy user: `{"user": {"user_id": "<username>", "data": {"balance": "...", "product_ids": []}}}`
-    - Legacy order response nests data and uses `order_id`; modern uses `id` and flattens fields.
+### Identifiers
+- Upgraded API uses UUIDs when needed
+- Legacy API uses username and product names
+- Client should treat all IDs as opaque strings

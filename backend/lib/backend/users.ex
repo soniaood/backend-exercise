@@ -4,7 +4,7 @@ defmodule Backend.Users do
 
   Exposes business operations around application users:
   — Registration and authentication
-  — Retrieving users (by id and by username for Frontend legacy compatibility)
+  — Retrieving users (by id and by username for Frontend prototype compatibility)
   — Managing balances
   — Querying and attaching purchased product ids via the `user_products` join
 
@@ -52,7 +52,7 @@ defmodule Backend.Users do
     Repo.one(query)
   end
 
-  # For legacy endpoint compatibility
+  # For Frontend prototype endpoint compatibility
   def get_user_by_username(username) do
     query =
       from u in User,
@@ -65,7 +65,7 @@ defmodule Backend.Users do
     end
   end
 
-  # For legacy endpoint compatibility
+  # For Frontend prototype endpoint compatibility
   defp create_user(attrs) do
     %User{}
     |> User.create_changeset(attrs)

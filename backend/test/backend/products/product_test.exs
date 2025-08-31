@@ -8,23 +8,23 @@ defmodule Backend.Products.ProductTest do
   describe "changeset/2" do
     test "creates valid changeset with all required fields" do
       attrs = %{
-        id: "netflix",
-        name: "Netflix Subscription",
+        name: "netflix",
+        description: "Netflix Subscription",
         price: Decimal.new("75.99")
       }
 
       changeset = Product.changeset(%Product{}, attrs)
 
       assert changeset.valid?
-      assert get_change(changeset, :id) == "netflix"
-      assert get_change(changeset, :name) == "Netflix Subscription"
+      assert get_change(changeset, :name) == "netflix"
+      assert get_change(changeset, :description) == "Netflix Subscription"
       assert get_change(changeset, :price) == Decimal.new("75.99")
     end
 
     test "creates valid changeset with string price" do
       attrs = %{
-        id: "spotify",
-        name: "Spotify Premium",
+        name: "spotify",
+        description: "Spotify Premium",
         price: "45.99"
       }
 
@@ -36,8 +36,8 @@ defmodule Backend.Products.ProductTest do
 
     test "creates valid changeset with integer price" do
       attrs = %{
-        id: "gym",
-        name: "Gym Membership",
+        name: "gym",
+        description: "Gym Membership",
         price: 120
       }
 
@@ -49,8 +49,8 @@ defmodule Backend.Products.ProductTest do
 
     test "creates valid changeset with minimum valid price" do
       attrs = %{
-        id: "micro-payment",
-        name: "Micro Payment",
+        name: "micro-payment",
+        description: "Micro Payment",
         price: Decimal.new("0.01")
       }
 
@@ -62,8 +62,8 @@ defmodule Backend.Products.ProductTest do
 
     test "creates valid changeset with very high price" do
       attrs = %{
-        id: "expensive",
-        name: "Expensive Product",
+        name: "expensive",
+        description: "Expensive Product",
         price: Decimal.new("99999.99")
       }
 
@@ -72,25 +72,25 @@ defmodule Backend.Products.ProductTest do
       assert changeset.valid?
     end
 
-    test "accepts long product names" do
-      long_name = String.duplicate("A", 255)
+    test "accepts long product descriptions" do
+      long_description = String.duplicate("A", 255)
 
       attrs = %{
-        id: "long-name",
-        name: long_name,
+        name: "long-name",
+        description: long_description,
         price: Decimal.new("10.00")
       }
 
       changeset = Product.changeset(%Product{}, attrs)
 
       assert changeset.valid?
-      assert get_change(changeset, :name) == long_name
+      assert get_change(changeset, :description) == long_description
     end
 
-    test "accepts special characters in id" do
+    test "accepts special characters in name" do
       attrs = %{
-        id: "product-with-dashes_and_underscores.123",
-        name: "Special Product",
+        name: "product-with-dashes_and_underscores.123",
+        description: "Special Product",
         price: "10.00"
       }
 
@@ -99,17 +99,17 @@ defmodule Backend.Products.ProductTest do
       assert changeset.valid?
     end
 
-    test "accepts unicode characters in name" do
+    test "accepts unicode characters in description" do
       attrs = %{
-        id: "unicode-product",
-        name: "Café Münchën 北京",
+        name: "unicode-product",
+        description: "Café Münchën 北京",
         price: "10.00"
       }
 
       changeset = Product.changeset(%Product{}, attrs)
 
       assert changeset.valid?
-      assert get_change(changeset, :name) == "Café Münchën 北京"
+      assert get_change(changeset, :description) == "Café Münchën 北京"
     end
   end
 
@@ -242,23 +242,10 @@ defmodule Backend.Products.ProductTest do
       assert changeset.errors[:price] != nil
     end
 
-    test "rejects whitespace-only id" do
-      attrs = %{
-        id: "   ",
-        name: "Product Name",
-        price: "10.00"
-      }
-
-      changeset = Product.changeset(%Product{}, attrs)
-
-      refute changeset.valid?
-      assert %{id: ["can't be blank"]} = errors_on(changeset)
-    end
-
     test "rejects whitespace-only name" do
       attrs = %{
-        id: "product-id",
         name: "   ",
+        description: "Product Description",
         price: "10.00"
       }
 
@@ -272,16 +259,16 @@ defmodule Backend.Products.ProductTest do
   describe "changeset/2 type casting" do
     test "casts string keys to proper types" do
       attrs = %{
-        "id" => "string-key",
-        "name" => "Product Name",
+        "name" => "string-key",
+        "description" => "Product Name",
         "price" => "19.99"
       }
 
       changeset = Product.changeset(%Product{}, attrs)
 
       assert changeset.valid?
-      assert get_change(changeset, :id) == "string-key"
-      assert get_change(changeset, :name) == "Product Name"
+      assert get_change(changeset, :name) == "string-key"
+      assert get_change(changeset, :description) == "Product Name"
       assert get_change(changeset, :price) == Decimal.new("19.99")
     end
 
@@ -429,7 +416,7 @@ defmodule Backend.Products.ProductTest do
 
   describe "schema associations" do
     test "has correct associations defined" do
-      product = %Product{}
+      _product = %Product{}
 
       # Test that associations are defined (doesn't test database relationships)
       assert %Ecto.Association.Has{} = Product.__schema__(:association, :order_items)
@@ -450,12 +437,13 @@ defmodule Backend.Products.ProductTest do
       assert Product.__schema__(:primary_key) == [:id]
     end
 
-    test "primary key is string type" do
-      assert Product.__schema__(:type, :id) == :string
+    test "primary key is binary_id type" do
+      assert Product.__schema__(:type, :id) == :binary_id
     end
 
     test "has correct field types" do
       assert Product.__schema__(:type, :name) == :string
+      assert Product.__schema__(:type, :description) == :string
       assert Product.__schema__(:type, :price) == :decimal
     end
 

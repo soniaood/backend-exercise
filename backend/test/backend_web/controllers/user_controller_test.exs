@@ -25,13 +25,11 @@ defmodule BackendWeb.UserControllerTest do
         |> get(~p"/api/users/me")
 
       assert %{
-               "user" => %{
-                 "id" => returned_id,
-                 "username" => "johndoe",
-                 "email" => "john@example.com",
-                 "balance" => balance,
-                 "product_ids" => product_ids
-               }
+               "id" => returned_id,
+               "username" => "johndoe",
+               "email" => "john@example.com",
+               "balance" => balance,
+               "product_ids" => product_ids
              } = json_response(conn, 200)
 
       assert returned_id == user.id
@@ -60,9 +58,7 @@ defmodule BackendWeb.UserControllerTest do
         |> get(~p"/api/users/me")
 
       assert %{
-               "user" => %{
-                 "product_ids" => product_ids
-               }
+               "product_ids" => product_ids
              } = json_response(conn, 200)
 
       assert "netflix" in product_ids
@@ -259,9 +255,7 @@ defmodule BackendWeb.UserControllerTest do
         |> put_req_header("authorization", "Bearer #{token}")
         |> get(~p"/api/users/me")
 
-      assert %{
-               "user" => user_data
-             } = json_response(conn, 200)
+      user_data = json_response(conn, 200)
 
       # Verify all required fields are present
       required_fields = ["id", "username", "email", "balance", "product_ids"]
@@ -324,7 +318,7 @@ defmodule BackendWeb.UserControllerTest do
       legacy_response = json_response(legacy_conn, 200)
 
       # Compare core data
-      modern_user = modern_response["user"]
+      modern_user = modern_response
       legacy_user = legacy_response["user"]
 
       assert modern_user["username"] == legacy_user["user_id"]
@@ -339,9 +333,9 @@ defmodule BackendWeb.UserControllerTest do
     alias Backend.Repo
 
     products = [
-      %{id: "netflix", name: "Netflix Subscription", price: Decimal.new("75.99")},
-      %{id: "spotify", name: "Spotify Premium", price: Decimal.new("45.99")},
-      %{id: "gym", name: "Gym Membership", price: Decimal.new("120.00")}
+      %{name: "netflix", description: "Netflix Subscription", price: Decimal.new("75.99")},
+      %{name: "spotify", description: "Spotify Premium", price: Decimal.new("45.99")},
+      %{name: "gym", description: "Gym Membership", price: Decimal.new("120.00")}
     ]
 
     Enum.each(products, fn attrs ->

@@ -304,9 +304,9 @@ defmodule Backend.Users.UserProductTest do
       assert order_assoc.related == Backend.Orders.Order
     end
 
-    test "product association uses string type" do
-      # Check that the product_id field type matches the product's string type
-      assert UserProduct.__schema__(:type, :product_id) == :string
+    test "product association uses binary_id type" do
+      # Check that the product_id field type matches the product's binary_id type
+      assert UserProduct.__schema__(:type, :product_id) == :binary_id
     end
   end
 
@@ -321,7 +321,7 @@ defmodule Backend.Users.UserProductTest do
 
     test "has correct field types" do
       assert UserProduct.__schema__(:type, :user_id) == :binary_id
-      assert UserProduct.__schema__(:type, :product_id) == :string
+      assert UserProduct.__schema__(:type, :product_id) == :binary_id
       assert UserProduct.__schema__(:type, :order_id) == :binary_id
     end
 
@@ -343,8 +343,8 @@ defmodule Backend.Users.UserProductTest do
       assert user_assoc.owner_key == :user_id
       assert order_assoc.owner_key == :order_id
 
-      # product_id is explicitly defined as string type in the schema
-      assert UserProduct.__schema__(:type, :product_id) == :string
+      # product_id is explicitly defined as binary_id type in the schema
+      assert UserProduct.__schema__(:type, :product_id) == :binary_id
     end
 
     test "has no non-association fields besides foreign keys and timestamps" do

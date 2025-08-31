@@ -16,34 +16,47 @@ defmodule BackendWeb.Router do
     plug Guardian.Plug.LoadResource
   end
 
-  scope "/api", BackendWeb do
-    pipe_through :api
-
-    # Authentication
-    post "/auth/register", AuthController, :register
-    post "/auth/login", AuthController, :login
-
-    # Public endpoints
-    get "/products", ProductController, :index
+  pipeline :v1_only do
+    plug :ensure_v1_header
   end
 
-  scope "/api", BackendWeb do
+  defp ensure_v1_header(conn, _opts) do
+    case get_req_header(conn, "api-version") do
+      ["v1"] -> conn
+      _ ->
+        conn
+        |> put_status(:bad_request)
+        |> json(%{error: "missing_version", message: "API-Version: v1 header required"})
+        |> halt()
+    end
+  end
+
+  # Upgraded V1 API endpoints
+  scope "/api/v1", BackendWeb do
+    pipe_through :api
+
+    # Public V1 endpoints
+    get "/products", ProductController, :index
+    post "/auth/register", AuthController, :register
+    post "/auth/login", AuthController, :login
+  end
+
+  scope "/api/v1", BackendWeb do
     pipe_through [:api, :authenticated]
 
     get "/users/me", UserController, :me
     post "/auth/refresh", AuthController, :refresh
     post "/auth/logout", AuthController, :logout
-
-    post "/orders", OrderController, :create_authenticated
+    post "/orders", OrderController, :create
   end
 
-  # Legacy endpoints for frontend compatibility
-  scope "/", BackendWeb do
+  # Prototype endpoints (for frontend compatibility)
+  scope "/api", BackendWeb do
     pipe_through :api
 
-    get "/products", ProductController, :index_legacy
-    get "/users/:username", UserController, :get_by_username
-    post "/orders", OrderController, :create
+    get "/products", ProductController, :index_prototype
+    get "/users/:username", UserController, :get_by_username_prototype
+    post "/orders", OrderController, :create_prototype
   end
 
   # Enable LiveDashboard and Swoosh mailbox preview in development

@@ -8,18 +8,15 @@ defmodule BackendWeb.UserController do
     product_ids = Users.get_user_product_ids(user)
 
     json(conn, %{
-      user: %{
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        balance: user.balance,
-        product_ids: product_ids
-      }
+      username: user.username,
+      email: user.email,
+      balance: user.balance,
+      product_ids: product_ids
     })
   end
 
   # For Frontend - deprecated but maintained for compatibility
-  def get_by_username(conn, %{"username" => username}) do
+  def get_by_username_prototype(conn, %{"username" => username}) do
     conn = put_resp_header(conn, "x-deprecated", "Use GET /api/users/me with authentication")
 
     case Users.get_user_by_username(username) do
