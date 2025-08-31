@@ -269,7 +269,7 @@ defmodule Backend.Users.UserProductTest do
 
   describe "schema associations" do
     test "has correct associations defined" do
-      user_product = %UserProduct{}
+      _user_product = %UserProduct{}
 
       assert %Ecto.Association.BelongsTo{} = UserProduct.__schema__(:association, :user)
       assert %Ecto.Association.BelongsTo{} = UserProduct.__schema__(:association, :product)

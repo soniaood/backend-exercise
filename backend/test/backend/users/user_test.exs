@@ -341,7 +341,7 @@ defmodule Backend.Users.UserTest do
 
   describe "schema associations" do
     test "has correct associations defined" do
-      user = %User{}
+      _user = %User{}
 
       assert %Ecto.Association.Has{} = User.__schema__(:association, :orders)
       assert %Ecto.Association.Has{} = User.__schema__(:association, :user_products)

@@ -33,6 +33,21 @@ defmodule Backend.Orders do
 
   def create_order(user_id, product_ids) do
     Multi.new()
+    |> Multi.run(:validate_input, fn _repo, _changes ->
+      cond do
+        is_nil(product_ids) or product_ids == [] ->
+          {:error, :empty_product_list}
+
+        !is_list(product_ids) ->
+          {:error, :invalid_product_list}
+
+        length(product_ids) != length(Enum.uniq(product_ids)) ->
+          {:error, :duplicate_products_in_request}
+
+        true ->
+          {:ok, product_ids}
+      end
+    end)
     |> Multi.run(:user, fn _repo, _changes ->
       case Users.get_user_with_products(user_id) do
         %Backend.Users.User{} = user -> {:ok, user}

@@ -29,7 +29,7 @@ defmodule BackendWeb.OrderControllerTest do
                    "total" => total
                  }
                }
-             } = json_response(conn<, 200)
+             } = json_response(conn, 200)
 
       assert is_binary(order_id)
       assert is_list(items)

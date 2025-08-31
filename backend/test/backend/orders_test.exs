@@ -6,8 +6,6 @@ defmodule Backend.OrdersTest do
   alias Backend.Products.Product
   alias Backend.Users.{User, UserProduct}
 
-  import Backend.DataCase, only: [errors_on: 1]
-
   setup do
     {:ok, user} =
       Repo.insert(%User{
@@ -37,7 +35,7 @@ defmodule Backend.OrdersTest do
     } do
       product_ids = [product1.id, product2.id]
 
-      assert {:ok, %{order: order}} = Orders.create_order(user.username, product_ids)
+      assert {:ok, %{order: order}} = Orders.create_order(user.id, product_ids)
 
       assert order.user_id == user.id
       assert order.total == Decimal.new("30.00")
@@ -55,17 +53,12 @@ defmodule Backend.OrdersTest do
       assert updated_user.balance == Decimal.new("70.00")
     end
 
-    test "creates user if doesn't exist", %{product1: product1} do
-      product_ids = [product1.id]
+    test "returns error when user not found" do
+      fake_user_id = Ecto.UUID.generate()
+      product_ids = [Ecto.UUID.generate()]
 
-      assert {:ok, %{order: order, user: created_user, update_balance: updated_user}} =
-               Orders.create_order("newuser", product_ids)
-
-      assert created_user.username == "newuser"
-      # 1000.00 - 10.00
-      assert updated_user.balance == Decimal.new("990.00")
-      assert order.user_id == created_user.id
-      assert order.total == Decimal.new("10.00")
+      assert {:error, :user, :user_not_found, _} =
+               Orders.create_order(fake_user_id, product_ids)
     end
 
     test "returns error when products not found", %{user: user} do
@@ -74,7 +67,7 @@ defmodule Backend.OrdersTest do
       product_ids = [fake_uuid1, fake_uuid2]
 
       assert {:error, :products, :products_not_found, _} =
-               Orders.create_order(user.username, product_ids)
+               Orders.create_order(user.id, product_ids)
     end
 
     test "returns error when some products not found", %{user: user, product1: product1} do
@@ -82,7 +75,7 @@ defmodule Backend.OrdersTest do
       product_ids = [product1.id, fake_uuid]
 
       assert {:error, :products, :products_not_found, _} =
-               Orders.create_order(user.username, product_ids)
+               Orders.create_order(user.id, product_ids)
     end
 
     test "returns error when user already purchased products", %{
@@ -92,14 +85,14 @@ defmodule Backend.OrdersTest do
     } do
       # First purchase
       {:ok, order} =
-        Repo.insert(%Backend.Orders.Order{user_id: user.id, total: Decimal.new("10.00")})
+        Repo.insert(%Order{user_id: user.id, total: Decimal.new("10.00")})
 
       Repo.insert(%UserProduct{user_id: user.id, product_id: product1.id, order_id: order.id})
 
       product_ids = [product1.id, product2.id]
 
       assert {:error, :validate_products, :products_already_purchased, _} =
-               Orders.create_order(user.username, product_ids)
+               Orders.create_order(user.id, product_ids)
     end
 
     test "returns error when insufficient balance", %{
@@ -111,11 +104,11 @@ defmodule Backend.OrdersTest do
       # Update user balance to be insufficient
       Repo.update!(User.changeset(user, %{balance: Decimal.new("20.00")}))
 
-      # Total: 45.00
+      # Total: 45.00 (10 + 20 + 15)
       product_ids = [product1.id, product2.id, product3.id]
 
       assert {:error, :validate_balance, :insufficient_balance, _} =
-               Orders.create_order(user.username, product_ids)
+               Orders.create_order(user.id, product_ids)
     end
 
     test "handles exact balance match", %{user: user, product1: product1, product2: product2} do
@@ -125,7 +118,7 @@ defmodule Backend.OrdersTest do
       # Total: 30.00
       product_ids = [product1.id, product2.id]
 
-      assert {:ok, %{order: order}} = Orders.create_order(user.username, product_ids)
+      assert {:ok, %{order: _order}} = Orders.create_order(user.id, product_ids)
 
       updated_user = Repo.get(User, user.id)
       assert updated_user.balance == Decimal.new("0.00")
@@ -134,7 +127,7 @@ defmodule Backend.OrdersTest do
     test "handles single product purchase", %{user: user, product1: product1} do
       product_ids = [product1.id]
 
-      assert {:ok, %{order: order}} = Orders.create_order(user.username, product_ids)
+      assert {:ok, %{order: order}} = Orders.create_order(user.id, product_ids)
 
       assert order.total == Decimal.new("10.00")
 
@@ -144,15 +137,34 @@ defmodule Backend.OrdersTest do
       assert hd(order_items).price == product1.price
     end
 
-    test "handles empty product list", %{user: user} do
-      assert {:error, :order, changeset, _} = Orders.create_order(user.username, [])
-      assert %{total: ["must be greater than 0"]} = errors_on(changeset)
+    # New validation tests for input validation
+    test "returns error for empty product list", %{user: user} do
+      assert {:error, :validate_input, :empty_product_list, _} =
+               Orders.create_order(user.id, [])
     end
 
-    test "transaction rolls back on failure", %{user: user, product1: product1} do
+    test "returns error for nil product list", %{user: user} do
+      assert {:error, :validate_input, :empty_product_list, _} =
+               Orders.create_order(user.id, nil)
+    end
+
+    test "returns error for non-list product_ids", %{user: user} do
+      assert {:error, :validate_input, :invalid_product_list, _} =
+               Orders.create_order(user.id, "not-a-list")
+    end
+
+    test "returns error for duplicate products in request", %{user: user, product1: product1} do
+      # Same product ID twice
+      product_ids = [product1.id, product1.id]
+
+      assert {:error, :validate_input, :duplicate_products_in_request, _} =
+               Orders.create_order(user.id, product_ids)
+    end
+
+    test "transaction rolls back on validation failure", %{user: user, product1: product1} do
       # Mock a failure by trying to purchase already owned product
       {:ok, order} =
-        Repo.insert(%Backend.Orders.Order{user_id: user.id, total: Decimal.new("10.00")})
+        Repo.insert(%Order{user_id: user.id, total: Decimal.new("10.00")})
 
       Repo.insert(%UserProduct{user_id: user.id, product_id: product1.id, order_id: order.id})
 
@@ -162,7 +174,7 @@ defmodule Backend.OrdersTest do
       initial_balance = user.balance
 
       assert {:error, :validate_products, :products_already_purchased, _} =
-               Orders.create_order(user.username, [product1.id])
+               Orders.create_order(user.id, [product1.id])
 
       # Verify no changes were made
       assert Repo.aggregate(Order, :count) == initial_orders_count
@@ -218,7 +230,7 @@ defmodule Backend.OrdersTest do
     end
 
     test "returns nil when order doesn't exist" do
-      fake_uuid = "00000000-0000-0000-0000-000000000000"
+      fake_uuid = Ecto.UUID.generate()
       assert Orders.get_order_with_items(fake_uuid) == nil
     end
 

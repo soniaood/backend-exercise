@@ -18,9 +18,6 @@ defmodule BackendWeb.OrderController do
 
       {:error, _step, reason, _changes} ->
         handle_order_error(conn, reason)
-
-      {:error, reason} ->
-        handle_order_error(conn, reason)
     end
   end
 
@@ -53,9 +50,6 @@ defmodule BackendWeb.OrderController do
               json(conn, response)
 
             {:error, _step, reason, _changes} ->
-              handle_order_error(conn, reason)
-
-            {:error, reason} ->
               handle_order_error(conn, reason)
           end
         end
@@ -93,6 +87,30 @@ defmodule BackendWeb.OrderController do
 
   defp handle_order_error(conn, reason) do
     case reason do
+      :empty_product_list ->
+        conn
+        |> put_status(:bad_request)
+        |> json(%{
+          error: "invalid_request",
+          message: "Items list cannot be empty"
+        })
+
+      :invalid_product_list ->
+        conn
+        |> put_status(:bad_request)
+        |> json(%{
+          error: "invalid_request",
+          message: "Items must be provided as a list"
+        })
+
+      :duplicate_products_in_request ->
+        conn
+        |> put_status(:bad_request)
+        |> json(%{
+          error: "duplicate_products",
+          message: "Cannot order the same product multiple times in one request"
+        })
+
       :products_not_found ->
         conn
         |> put_status(:bad_request)

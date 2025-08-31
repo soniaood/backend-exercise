@@ -292,7 +292,7 @@ defmodule Backend.Orders.OrderTest do
 
   describe "schema associations" do
     test "has correct associations defined" do
-      order = %Order{}
+      _order = %Order{}
 
       assert %Ecto.Association.BelongsTo{} = Order.__schema__(:association, :user)
       assert %Ecto.Association.Has{} = Order.__schema__(:association, :order_items)

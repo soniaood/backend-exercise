@@ -35,8 +35,11 @@ defmodule Backend.Products do
   @doc """
   Get a single product by its name identifier.
   For Frontend prototype endpoint compatibility
+  Returns nil if name is nil or empty.
   """
-  def get_product_by_name(product_name) do
+  def get_product_by_name(nil), do: nil
+  def get_product_by_name(""), do: nil
+  def get_product_by_name(product_name) when is_binary(product_name) do
     Repo.get_by(Product, name: product_name)
   end
 

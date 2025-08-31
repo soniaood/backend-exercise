@@ -5,16 +5,6 @@ defmodule Backend.ProductsTest do
   alias Backend.Products.Product
 
   describe "list_products/0" do
-    setup do
-      # Clear existing data for this test
-      Repo.delete_all(Backend.Orders.OrderItem)
-      Repo.delete_all(Backend.Users.UserProduct)
-      Repo.delete_all(Backend.Orders.Order)
-      Repo.delete_all(Backend.Users.User)
-      Repo.delete_all(Product)
-      :ok
-    end
-
     test "returns all products" do
       {:ok, product1} =
         Repo.insert(%Product{name: "product1", description: "Product 1", price: Decimal.new("10.00")})
@@ -31,7 +21,24 @@ defmodule Backend.ProductsTest do
     end
 
     test "returns empty list when no products exist" do
+      # DataCase should handle cleanup automatically
       assert Products.list_products() == []
+    end
+
+    test "returns products in insertion order" do
+      {:ok, _product1} =
+        Repo.insert(%Product{name: "first", description: "First Product", price: Decimal.new("10.00")})
+
+      {:ok, _product2} =
+        Repo.insert(%Product{name: "second", description: "Second Product", price: Decimal.new("20.00")})
+
+      products = Products.list_products()
+
+      # Should maintain database order
+      assert length(products) == 2
+      [first, second] = products
+      assert first.name == "first"
+      assert second.name == "second"
     end
   end
 
@@ -63,7 +70,7 @@ defmodule Backend.ProductsTest do
       refute product2.id in product_ids
     end
 
-    test "returns empty list when no matching IDs", %{product1: _product1} do
+    test "returns empty list when no matching IDs" do
       fake_uuid1 = Ecto.UUID.generate()
       fake_uuid2 = Ecto.UUID.generate()
       products = Products.get_products_by_ids([fake_uuid1, fake_uuid2])
@@ -82,18 +89,37 @@ defmodule Backend.ProductsTest do
       assert length(products) == 1
       assert hd(products).id == product1.id
     end
+
+    test "preserves order of results based on database order", %{
+      product1: product1,
+      product2: product2
+    } do
+      # Request in reverse order
+      products = Products.get_products_by_ids([product2.id, product1.id])
+
+      # Should return in database order, not request order
+      assert length(products) == 2
+    end
+
+    test "handles duplicate IDs in request", %{product1: product1} do
+      # Same ID twice - should only return one product
+      products = Products.get_products_by_ids([product1.id, product1.id])
+
+      assert length(products) == 1
+      assert hd(products).id == product1.id
+    end
   end
 
   describe "get_products_by_names/1" do
     setup do
       {:ok, product1} =
-        Repo.insert(%Product{name: "test_netflix", description: "Test Netflix", price: Decimal.new("75.99")})
+        Repo.insert(%Product{name: "netflix", description: "Netflix Subscription", price: Decimal.new("75.99")})
 
       {:ok, product2} =
-        Repo.insert(%Product{name: "test_spotify", description: "Test Spotify", price: Decimal.new("45.99")})
+        Repo.insert(%Product{name: "spotify", description: "Spotify Premium", price: Decimal.new("45.99")})
 
       {:ok, product3} =
-        Repo.insert(%Product{name: "test_gym", description: "Test Gym", price: Decimal.new("120.00")})
+        Repo.insert(%Product{name: "gym", description: "Gym Membership", price: Decimal.new("120.00")})
 
       %{product1: product1, product2: product2, product3: product3}
     end
@@ -103,13 +129,13 @@ defmodule Backend.ProductsTest do
       product2: _product2,
       product3: _product3
     } do
-      products = Products.get_products_by_names(["test_netflix", "test_gym"])
+      products = Products.get_products_by_names(["netflix", "gym"])
 
       assert length(products) == 2
       product_names = Enum.map(products, & &1.name)
-      assert "test_netflix" in product_names
-      assert "test_gym" in product_names
-      refute "test_spotify" in product_names
+      assert "netflix" in product_names
+      assert "gym" in product_names
+      refute "spotify" in product_names
     end
 
     test "returns empty list when no matching names" do
@@ -123,29 +149,59 @@ defmodule Backend.ProductsTest do
     end
 
     test "handles mix of existing and non-existing names", %{product1: product1} do
-      products = Products.get_products_by_names(["test_netflix", "nonexistent"])
+      products = Products.get_products_by_names(["netflix", "nonexistent"])
 
       assert length(products) == 1
       assert hd(products).name == product1.name
+    end
+
+    test "is case sensitive" do
+      Repo.insert(%Product{name: "transportation", description: "Transport", price: Decimal.new("75.99")})
+
+      # Should not match different case
+      products = Products.get_products_by_names(["Transport", "TRANSPORT"])
+      assert products == []
+
+      # Should match exact case
+      products = Products.get_products_by_names(["transportation"])
+      assert length(products) == 1
     end
   end
 
   describe "get_product_by_name/1" do
     setup do
       {:ok, product} =
-        Repo.insert(%Product{name: "test_product", description: "Test Product", price: Decimal.new("75.99")})
+        Repo.insert(%Product{name: "unique_product", description: "Unique Product", price: Decimal.new("99.99")})
 
       %{product: product}
     end
 
     test "returns product with matching name", %{product: product} do
-      found_product = Products.get_product_by_name("test_product")
+      found_product = Products.get_product_by_name("unique_product")
       assert found_product.id == product.id
-      assert found_product.name == "test_product"
+      assert found_product.name == "unique_product"
+      assert found_product.description == "Unique Product"
+      assert found_product.price == Decimal.new("99.99")
     end
 
     test "returns nil when no matching name" do
       assert Products.get_product_by_name("nonexistent") == nil
+    end
+
+    test "returns nil for empty string" do
+      assert Products.get_product_by_name("") == nil
+    end
+
+    test "returns nil for nil input" do
+      assert Products.get_product_by_name(nil) == nil
+    end
+
+    test "is case sensitive" do
+      Repo.insert(%Product{name: "casesensitive", description: "Test", price: Decimal.new("10.00")})
+
+      assert Products.get_product_by_name("casesensitive") != nil
+      assert Products.get_product_by_name("CaseSensitive") == nil
+      assert Products.get_product_by_name("CASESENSITIVE") == nil
     end
   end
 
@@ -159,8 +215,8 @@ defmodule Backend.ProductsTest do
 
       assert {:ok, product} = Products.create_product(attrs)
       assert is_binary(product.id)  # UUID is generated
-      assert product.name == "new_product"  # name field contains identifier
-      assert product.description == "New Product"  # description field contains display name
+      assert product.name == "new_product"
+      assert product.description == "New Product"
       assert product.price == Decimal.new("25.99")
     end
 
@@ -168,18 +224,20 @@ defmodule Backend.ProductsTest do
       attrs = %{name: "", description: "", price: "invalid"}
 
       assert {:error, changeset} = Products.create_product(attrs)
-      assert %{name: ["can't be blank"]} = errors_on(changeset)
-      assert %{description: ["can't be blank"]} = errors_on(changeset)
-      assert %{price: ["is invalid"]} = errors_on(changeset)
+      errors = errors_on(changeset)
+      assert %{name: ["can't be blank"]} = errors
+      assert %{description: ["can't be blank"]} = errors
+      assert %{price: ["is invalid"]} = errors
     end
 
     test "returns error with missing required fields" do
       attrs = %{}
 
       assert {:error, changeset} = Products.create_product(attrs)
-      assert %{name: ["can't be blank"]} = errors_on(changeset)
-      assert %{description: ["can't be blank"]} = errors_on(changeset)
-      assert %{price: ["can't be blank"]} = errors_on(changeset)
+      errors = errors_on(changeset)
+      assert %{name: ["can't be blank"]} = errors
+      assert %{description: ["can't be blank"]} = errors
+      assert %{price: ["can't be blank"]} = errors
     end
 
     test "returns error with negative price" do
@@ -204,6 +262,19 @@ defmodule Backend.ProductsTest do
       assert %{price: ["must be greater than 0"]} = errors_on(changeset)
     end
 
+    test "returns error with duplicate name" do
+      # Create first product
+      attrs1 = %{name: "duplicate", description: "First", price: Decimal.new("10.00")}
+      assert {:ok, _} = Products.create_product(attrs1)
+
+      # Try to create second with same name
+      attrs2 = %{name: "duplicate", description: "Second", price: Decimal.new("20.00")}
+      assert {:error, changeset} = Products.create_product(attrs2)
+
+      # Should fail due to unique constraint
+      assert %{name: ["has already been taken"]} = errors_on(changeset)
+    end
+
     test "creates product with minimum valid price" do
       attrs = %{
         name: "cheap_product",
@@ -213,6 +284,39 @@ defmodule Backend.ProductsTest do
 
       assert {:ok, product} = Products.create_product(attrs)
       assert product.price == Decimal.new("0.01")
+    end
+
+    test "accepts string price input" do
+      attrs = %{
+        name: "string_price",
+        description: "String Price Product",
+        price: "99.99"
+      }
+
+      assert {:ok, product} = Products.create_product(attrs)
+      assert product.price == Decimal.new("99.99")
+    end
+
+    test "accepts integer price input" do
+      attrs = %{
+        name: "integer_price",
+        description: "Integer Price Product",
+        price: 50
+      }
+
+      assert {:ok, product} = Products.create_product(attrs)
+      assert product.price == Decimal.new("50")
+    end
+
+    test "accepts float price input" do
+      attrs = %{
+        name: "float_price",
+        description: "Float Price Product",
+        price: 19.99
+      }
+
+      assert {:ok, product} = Products.create_product(attrs)
+      assert product.price == Decimal.new("19.99")
     end
   end
 end

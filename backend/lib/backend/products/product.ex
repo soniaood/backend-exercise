@@ -25,6 +25,6 @@ defmodule Backend.Products.Product do
     |> cast(attrs, [:name, :description, :price])
     |> validate_required([:name, :description, :price])
     |> validate_number(:price, greater_than: 0)
-    |> unique_constraint(:name)
+    |> unique_constraint(:name, name: :products_name_unique)
   end
 end
