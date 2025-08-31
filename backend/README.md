@@ -84,15 +84,6 @@ erDiagram
         datetime updated_at
     }
     
-    Product {
-        uuid id PK
-        string name UK
-        string description
-        decimal price
-        datetime inserted_at
-        datetime updated_at
-    }
-    
     Order {
         uuid id PK
         uuid user_id FK
@@ -110,6 +101,15 @@ erDiagram
         datetime updated_at
     }
     
+    Product {
+        uuid id PK
+        string name UK
+        string description
+        decimal price
+        datetime inserted_at
+        datetime updated_at
+    }
+    
     UserProduct {
         uuid id PK
         uuid user_id FK
@@ -120,8 +120,8 @@ erDiagram
     }
     
     User ||--o{ Order : "places"
-    Order ||--o{ OrderItem : "contains"
-    Product ||--o{ OrderItem : "included_in"
+    Order ||--o{ OrderItem : "contains" 
+    OrderItem }o--|| Product : "references"
     User ||--o{ UserProduct : "owns"
     Product ||--o{ UserProduct : "owned_by"
     Order ||--o{ UserProduct : "created_from"
@@ -129,9 +129,9 @@ erDiagram
 
 ## API Overview
 
-### Legacy Endpoints (Prototype Support)
+### Prototype Endpoints (Frontend Support)
 
-> ⚠️ **Deprecated**: These endpoints are maintained for frontend compatibility but have security and convention limitations.
+> ⚠️ These endpoints are maintained for frontend compatibility but have security and convention limitations.
 
 #### Get Products (Legacy)
 ```http
@@ -140,13 +140,15 @@ GET /api/products
 
 **Response:**
 ```json
-[
-  {
-    "id": "netflix",
-    "name": "Netflix Subscription", 
-    "price": "75.99"
-  }
-]
+{
+  "products": [
+    {
+      "id": "netflix",
+      "name": "Netflix Subscription", 
+      "price": "75.99"
+    }
+  ]
+}
 ```
 
 #### Get User by Username (Legacy)
@@ -329,9 +331,9 @@ graph TB
     end
     
     subgraph "Business Contexts"
-        Users[Users Context]
-        Products[Products Context]
-        Orders[Orders Context]
+        BackendUsers[Backend.Users]
+        BackendProducts[Backend.Products]  
+        BackendOrders[Backend.Orders]
     end
     
     Controllers --> AuthController
@@ -339,13 +341,13 @@ graph TB
     Controllers --> OrderController
     Controllers --> UserController
     
-    Contexts --> Users
-    Contexts --> Products
-    Contexts --> Orders
+    Contexts --> BackendUsers
+    Contexts --> BackendProducts
+    Contexts --> BackendOrders
     
-    Users --> Database
-    Products --> Database
-    Orders --> Database
+    BackendUsers --> Database
+    BackendProducts --> Database
+    BackendOrders --> Database
 ```
 
 ## Transaction Flow
@@ -354,27 +356,27 @@ graph TB
 sequenceDiagram
     participant Client
     participant OrderController
-    participant OrdersContext
+    participant BackendOrders as Backend.Orders
     participant Database
     
-    Client->>OrderController: POST /api/orders
-    OrderController->>OrdersContext: create_order(user_id, product_ids)
+    Client->>OrderController: POST /api/v1/orders
+    OrderController->>BackendOrders: create_order(user_id, product_ids)
     
-    OrdersContext->>Database: BEGIN TRANSACTION
-    OrdersContext->>Database: 1. Fetch user with products
-    OrdersContext->>Database: 2. Validate products exist
-    OrdersContext->>OrdersContext: 3. Check no duplicate purchases
-    OrdersContext->>OrdersContext: 4. Validate sufficient balance
-    OrdersContext->>Database: 5. Create order record
-    OrdersContext->>Database: 6. Insert order items
-    OrdersContext->>Database: 7. Record user ownership
-    OrdersContext->>Database: 8. Update user balance
-    OrdersContext->>Database: COMMIT TRANSACTION
+    BackendOrders->>Database: BEGIN TRANSACTION
+    BackendOrders->>Database: 1. Fetch user with products
+    BackendOrders->>Database: 2. Validate products exist
+    BackendOrders->>BackendOrders: 3. Check no duplicate purchases
+    BackendOrders->>BackendOrders: 4. Validate sufficient balance
+    BackendOrders->>Database: 5. Create order record
+    BackendOrders->>Database: 6. Insert order items
+    BackendOrders->>Database: 7. Record user ownership
+    BackendOrders->>Database: 8. Update user balance
+    BackendOrders->>Database: COMMIT TRANSACTION
     
-    OrdersContext-->>OrderController: {:ok, order_data}
+    BackendOrders-->>OrderController: {:ok, order_data}
     OrderController-->>Client: 200 OK with order details
     
-    Note over OrdersContext,Database: If any step fails, entire transaction rolls back
+    Note over BackendOrders,Database: If any step fails, entire transaction rolls back
 ```
 
 ## Prerequisites
