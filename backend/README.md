@@ -12,9 +12,9 @@ This project started with a simple requirement: build an API for an existing Rea
 - **Inconsistent data formats** - product names used as IDs
 - **REST inconsistency** - GET endpoints used for creating data
 
-Rather than forcing the frontend to change immediately, I designed a **dual API strategy** that supports both worlds.
+Rather than forcing the frontend to change immediately, this project aims to provide a solid foundation for future development while maintaining compatibility with the existing prototype.
 
-## The Solution: Prototype Compatibility + Production API
+## The Solution: Prototype Compatibility + Improved v1 API
 
 ### API Strategy Overview
 
@@ -55,6 +55,22 @@ GET /api/v1/products             # Proper UUID-based identification
 POST /api/v1/orders              # Authenticated, atomic transactions
 Authorization: Bearer <token>
 ```
+
+## Key Assumptions
+
+Understanding the constraints that shaped this design:
+
+**Business Logic**
+- Single currency (EUR) with 2 decimal precision for financial accuracy
+- One-time purchases only - users can't buy the same product twice
+- Static product catalog - products are seeded, not dynamically created yet
+- Default user balance of €1000.00 virtual currency for new accounts
+
+**Legacy Compatibility**
+- Support existing React frontend
+- Username-based user identification must be preserved
+- Product names (like "netflix") used as identifiers in legacy API
+- No breaking changes to existing endpoint contracts
 
 ## Core Features
 
