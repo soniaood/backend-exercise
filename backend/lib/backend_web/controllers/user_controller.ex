@@ -2,7 +2,7 @@ defmodule BackendWeb.UserController do
   use BackendWeb, :controller
   alias Backend.Users
 
-  # New secure endpoint - user loaded by Guardian
+  # Improved API - user loaded by Guardian
   def me(conn, _params) do
     user = Guardian.Plug.current_resource(conn)
     product_ids = Users.get_user_product_ids(user)
@@ -15,9 +15,9 @@ defmodule BackendWeb.UserController do
     })
   end
 
-  # For Frontend - deprecated but maintained for compatibility
+  # For Frontend
   def get_by_username_prototype(conn, %{"username" => username}) do
-    conn = put_resp_header(conn, "x-deprecated", "Use GET /api/users/me with authentication")
+    conn = put_resp_header(conn, "x-deprecated", "Use GET /api/v1/users/me with authentication")
 
     case Users.get_user_by_username(username) do
       {:ok, user} ->

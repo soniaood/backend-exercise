@@ -106,7 +106,7 @@ defmodule BackendWeb.ProductControllerTest do
 
       # Check the actual deprecation header message from your controller
       assert get_resp_header(conn, "x-deprecated") == [
-               "Use GET /api/products with API-Version: v1"
+               "Use GET /api/v1/products"
              ]
 
       assert %{"products" => products} = json_response(conn, 200)
@@ -124,7 +124,7 @@ defmodule BackendWeb.ProductControllerTest do
       conn = get(conn, ~p"/api/products")
 
       assert get_resp_header(conn, "x-deprecated") == [
-               "Use GET /api/products with API-Version: v1"
+               "Use GET /api/v1/products"
              ]
 
       assert json_response(conn, 200) == %{"products" => []}
@@ -136,7 +136,7 @@ defmodule BackendWeb.ProductControllerTest do
       assert conn.status == 200
 
       assert get_resp_header(conn, "x-deprecated") == [
-               "Use GET /api/products with API-Version: v1"
+               "Use GET /api/v1/products"
              ]
     end
 

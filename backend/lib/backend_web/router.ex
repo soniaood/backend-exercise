@@ -16,23 +16,6 @@ defmodule BackendWeb.Router do
     plug Guardian.Plug.LoadResource
   end
 
-  pipeline :v1_only do
-    plug :ensure_v1_header
-  end
-
-  defp ensure_v1_header(conn, _opts) do
-    case get_req_header(conn, "api-version") do
-      ["v1"] ->
-        conn
-
-      _ ->
-        conn
-        |> put_status(:bad_request)
-        |> json(%{error: "missing_version", message: "API-Version: v1 header required"})
-        |> halt()
-    end
-  end
-
   # Upgraded V1 API endpoints
   scope "/api/v1", BackendWeb do
     pipe_through :api

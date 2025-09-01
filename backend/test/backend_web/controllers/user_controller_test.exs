@@ -125,7 +125,7 @@ defmodule BackendWeb.UserControllerTest do
 
       # Verify deprecation header
       assert get_resp_header(conn, "x-deprecated") == [
-               "Use GET /api/users/me with authentication"
+               "Use GET /api/v1/users/me with authentication"
              ]
     end
 
@@ -149,7 +149,7 @@ defmodule BackendWeb.UserControllerTest do
       assert is_binary(balance) or is_number(balance)
 
       assert get_resp_header(conn, "x-deprecated") == [
-               "Use GET /api/users/me with authentication"
+               "Use GET /api/v1/users/me with authentication"
              ]
     end
 

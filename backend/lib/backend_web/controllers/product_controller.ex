@@ -1,9 +1,8 @@
-# lib/backend_web/controllers/product_controller.ex
 defmodule BackendWeb.ProductController do
   use BackendWeb, :controller
   alias Backend.Products
 
-  # Modern API endpoint - /api/products
+  # Upgraded API endpoint
   def index(conn, _params) do
     products = Products.list_products()
 
@@ -20,9 +19,9 @@ defmodule BackendWeb.ProductController do
     )
   end
 
-  # For Frontend - /products
+  # For Frontend
   def index_prototype(conn, _params) do
-    conn = put_resp_header(conn, "x-deprecated", "Use GET /api/products with API-Version: v1")
+    conn = put_resp_header(conn, "x-deprecated", "Use GET /api/v1/products")
     products = Products.list_products()
 
     # Legacy response format for compatibility - show name as "id"

@@ -2,7 +2,7 @@ defmodule BackendWeb.OrderController do
   use BackendWeb, :controller
   alias Backend.{Orders, Products, Users}
 
-  # New secure endpoint - /api/orders (authenticated)
+  # Improved API
   def create(conn, %{"items" => items}) do
     user = Guardian.Plug.current_resource(conn)
 
@@ -20,9 +20,9 @@ defmodule BackendWeb.OrderController do
     end
   end
 
-  # For Frontend - /orders (unauthenticated, deprecated, for backward compatibility)
+  # For Frontend
   def create_prototype(conn, %{"order" => %{"items" => items, "user_id" => username}}) do
-    conn = put_resp_header(conn, "x-deprecated", "Use POST /api/orders with authentication")
+    conn = put_resp_header(conn, "x-deprecated", "Use POST /api/v1/orders with authentication")
 
     with {:ok, user} <- Users.get_user_by_username(username),
          {:ok, product_ids} <- validate_and_convert_product_names(items) do

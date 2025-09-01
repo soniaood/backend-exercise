@@ -68,29 +68,17 @@ POST /api/v1/orders              # Authenticated orders
 - Default user balance of €1000.00 virtual currency for new accounts
 
 **Legacy Compatibility**
-- Support existing React frontend
-- Username-based user identification must be preserved
-- Product names (like "netflix") used as identifiers in legacy API
-- No breaking changes to existing endpoint contracts
+- Support existing React frontend:
+  - Username-based user identification
+  - Product names (like "netflix") used as identifiers
+  - No breaking changes to existing endpoint contracts
 
 ## Core Features
 
-### **Dual Authentication Model**
-- **Legacy endpoints**: Open access for prototype compatibility
-- **V1 endpoints**: JWT-based authentication with bcrypt password hashing
-- **User management**: Registration, login, and secure session handling
-
-### **Robust Order Processing**
-- **Atomic transactions**: All-or-nothing order processing using `Ecto.Multi`
-- **Balance validation**: Prevents overdrafts
-- **Duplicate prevention**: Users can't buy the same product twice
-- **Automatic rollback**: Database consistency guaranteed on failures
-
-### **Smart Data Design**
-- **UUID primary keys**: Security and scalability
-- **Decimal precision**: Accurate financial calculations
-- **Foreign key constraints**: Data integrity at the database level
-- **Optimized queries**: Preloading to minimize N+1 problems
+- **Dual Authentication**: Legacy (open access) + V1 (JWT with bcrypt)
+- **Atomic Transactions**: All-or-nothing order processing with automatic rollback
+- **Balance & Ownership Validation**: Prevents overdrafts and duplicate purchases
+- **UUID Keys & Decimal Precision**: Security and accurate financial calculations
 
 ## Quick Start
 
@@ -110,7 +98,7 @@ cd backend-exercise-master/backend
 docker-compose up -d
 
 # Install dependencies and setup database with migrations and seeds
-mix mix.setup
+mix setup
 
 # Start the Phoenix server
 mix phx.server
