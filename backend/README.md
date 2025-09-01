@@ -26,7 +26,7 @@ The challenge required building an API for an existing React frontend prototype 
 
 This API addresses the limitations while still maintaining backwards compatibility for the Frontend prototype.
 
-### API Strategy Overview
+### API Overview
 
 ```mermaid
 graph LR
@@ -60,6 +60,13 @@ POST /api/v1/orders              # Authenticated orders
 ```
 
 ## Data Model
+
+### Entities
+- **User**: Account with balance and authentication credentials
+- **Product**: Benefit with pricing (Netflix, Spotify, etc.)
+- **Order**: Purchase transaction with total amount
+- **OrderItem**: Individual item within an order
+- **UserProduct**: Ownership product tracking
 
 ```mermaid
 erDiagram
@@ -116,34 +123,7 @@ erDiagram
     }
 ```
 
-Key relationships:
-- **Users** have a balance and can place multiple orders
-- **Orders** contain multiple products and belong to one user
-- **Products** have pricing and can appear in multiple orders
-- **UserProducts** tracks ownership to prevent duplicate purchases
-
-## Key Assumptions
-
-**Business Logic**
-- Single currency (EUR) with 2 decimal precision for financial accuracy
-- One-time purchases only - users can't buy the same product twice
-- Static product catalog - products are seeded, not dynamically created yet
-- Default user balance of €1000.00 virtual currency for new accounts
-
-**Legacy Compatibility**
-- Support existing React frontend:
-  - Username-based user identification
-  - Product names (like "netflix") used as identifiers
-  - No breaking changes to existing endpoint contracts
-
-## Core Features
-
-- **Dual Authentication**: Legacy (open access) + V1 (JWT with bcrypt)
-- **Atomic Transactions**: All-or-nothing order processing with automatic rollback
-- **Balance & Ownership Validation**: Prevents overdrafts and duplicate purchases
-- **UUID Keys & Decimal Precision**: Security and accurate financial calculations
-
-## Quick Start
+## Development Setup
 
 ### Requirements
 - **Elixir** 1.15+
@@ -151,11 +131,9 @@ Key relationships:
 - **PostgreSQL** 13+
 - **Docker** (for development)
 
-### Development Setup
+### Running the Application
 ```bash
-# Clone and navigate to backend
-git clone <repo-url>
-cd backend-exercise-master/backend
+cd backend
 
 # Database setup (PostgreSQL via Docker)
 docker-compose up -d
@@ -163,11 +141,10 @@ docker-compose up -d
 # Install dependencies and setup database with migrations and seeds
 mix setup
 
-# Start the Phoenix server
+# Start Phoenix server
 mix phx.server
 ```
 
-### API Endpoints
 The API will be available at:
 - **Legacy**: `http://localhost:4000/api/*` (for existing frontend)
 - **Enhanced**: `http://localhost:4000/api/v1/*` (for new applications)
@@ -182,8 +159,6 @@ mix test
 For manual API testing, use the provided HTTP file `api_test.http`:
 
 ```bash
-# Using IntelliJ IDEA / WebStorm HTTP Client
-
 # 1. User registration
 # 2. User login  
 # 3. Product listing
@@ -193,7 +168,28 @@ For manual API testing, use the provided HTTP file `api_test.http`:
 # 7. User logout
 ```
 
-### Transaction Safety
+## Key Assumptions
+
+**Business Logic**
+- Single currency (EUR) with 2 decimal precision for financial accuracy
+- One-time purchases only - users can't buy the same product twice
+- Static product catalog - products are seeded, not dynamically created yet
+- Default user balance of €1000.00 virtual currency for new accounts
+
+**Legacy Compatibility**
+- Support existing React frontend:
+    - Username-based user identification
+    - Product names (like "netflix") used as identifiers
+    - No breaking changes to existing endpoint contracts
+
+## Core Features
+
+- **Authentication**: Prototype (open access) + V1 API (JWT with bcrypt)
+- **Atomic Transactions**: All-or-nothing order processing with automatic rollback
+- **Balance & Ownership Validation**: Prevents overdrafts and duplicate purchases
+- **UUID Keys & Decimal Precision**: Security and accurate financial calculations
+
+## Transaction Safety
 
 The atomic order processing uses `Ecto.Multi` to ensure data consistency:
 
