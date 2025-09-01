@@ -3,7 +3,7 @@ defmodule BackendWeb.AuthControllerTest do
 
   alias Backend.{Users, Guardian}
 
-  describe "POST /api/auth/register" do
+  describe "POST /api/v1/auth/register" do
     test "registers a new user successfully", %{conn: conn} do
       user_params = %{
         "username" => "johndoe",
@@ -11,14 +11,11 @@ defmodule BackendWeb.AuthControllerTest do
         "password" => "SecurePass123!"
       }
 
-      conn = post(conn, ~p"/api/auth/register", %{"user" => user_params})
+      conn = post(conn, ~p"/api/v1/auth/register", user_params)
 
       assert %{
-               "user" => %{
-                 "id" => _user_id,
-                 "username" => "johndoe",
-                 "email" => "john@example.com"
-               },
+               "username" => "johndoe",
+               "email" => "john@example.com",
                "token" => token
              } = json_response(conn, 201)
 
@@ -33,7 +30,7 @@ defmodule BackendWeb.AuthControllerTest do
         "password" => "weak"
       }
 
-      conn = post(conn, ~p"/api/auth/register", %{"user" => invalid_params})
+      conn = post(conn, ~p"/api/v1/auth/register", invalid_params)
 
       assert %{
                "error" => "registration_failed",
@@ -44,8 +41,8 @@ defmodule BackendWeb.AuthControllerTest do
       assert is_map(details)
       # Should have validation errors
       assert Map.has_key?(details, "username") or
-               Map.has_key?(details, "email") or
-               Map.has_key?(details, "password")
+             Map.has_key?(details, "email") or
+             Map.has_key?(details, "password")
     end
 
     test "returns error for duplicate username", %{conn: conn} do
@@ -64,7 +61,7 @@ defmodule BackendWeb.AuthControllerTest do
         "password" => "SecurePass123!"
       }
 
-      conn = post(conn, ~p"/api/auth/register", %{"user" => duplicate_params})
+      conn = post(conn, ~p"/api/v1/auth/register", duplicate_params)
 
       assert %{
                "error" => "registration_failed",
@@ -90,7 +87,7 @@ defmodule BackendWeb.AuthControllerTest do
         "password" => "SecurePass123!"
       }
 
-      conn = post(conn, ~p"/api/auth/register", %{"user" => duplicate_params})
+      conn = post(conn, ~p"/api/v1/auth/register", duplicate_params)
 
       assert %{
                "error" => "registration_failed",
@@ -101,7 +98,7 @@ defmodule BackendWeb.AuthControllerTest do
     end
   end
 
-  describe "POST /api/auth/login" do
+  describe "POST /api/v1/auth/login" do
     setup do
       {:ok, user} =
         Users.register_user(%{
@@ -110,35 +107,31 @@ defmodule BackendWeb.AuthControllerTest do
           password: "SecurePass123!"
         })
 
-      # Create some products and a test order
+      # Create some products
       products = create_test_products()
+      [netflix | _] = products  # Pattern match to get first product
 
       # Create a proper order first
-      {:ok, %{order: order}} = Backend.Orders.create_order(user.username, [products[0].id])
-      Users.add_user_products(user.id, [products[0].id], order.id)
+      {:ok, %{order: _order}} = Backend.Orders.create_order(user.id, [netflix.id])
 
-      %{user: user}
+      %{user: user, products: products}
     end
 
-    test "logs in user with valid credentials", %{conn: conn, user: user} do
+    test "logs in user with valid credentials", %{conn: conn} do
       login_params = %{
         "username" => "johndoe",
         "password" => "SecurePass123!"
       }
 
-      conn = post(conn, ~p"/api/auth/login", login_params)
+      conn = post(conn, ~p"/api/v1/auth/login", login_params)
 
       assert %{
-               "user" => %{
-                 "id" => user_id,
-                 "username" => "johndoe",
-                 "balance" => _balance,
-                 "product_ids" => product_ids
-               },
+               "username" => "johndoe",
+               "balance" => _balance,
+               "product_ids" => product_ids,
                "token" => token
              } = json_response(conn, 200)
 
-      assert user_id == user.id
       assert is_binary(token)
       assert {:ok, _claims} = Guardian.decode_and_verify(token)
       assert is_list(product_ids)
@@ -150,7 +143,7 @@ defmodule BackendWeb.AuthControllerTest do
         "password" => "SecurePass123!"
       }
 
-      conn = post(conn, ~p"/api/auth/login", login_params)
+      conn = post(conn, ~p"/api/v1/auth/login", login_params)
 
       assert %{
                "error" => "invalid_credentials",
@@ -164,7 +157,7 @@ defmodule BackendWeb.AuthControllerTest do
         "password" => "WrongPassword"
       }
 
-      conn = post(conn, ~p"/api/auth/login", login_params)
+      conn = post(conn, ~p"/api/v1/auth/login", login_params)
 
       assert %{
                "error" => "invalid_credentials",
@@ -172,27 +165,25 @@ defmodule BackendWeb.AuthControllerTest do
              } = json_response(conn, 401)
     end
 
-    test "returns user's product_ids on login", %{conn: conn} do
+    test "returns user's product_ids on login", %{conn: conn, products: products} do
       login_params = %{
         "username" => "johndoe",
         "password" => "SecurePass123!"
       }
 
-      conn = post(conn, ~p"/api/auth/login", login_params)
+      conn = post(conn, ~p"/api/v1/auth/login", login_params)
 
       assert %{
-               "user" => %{
-                 "product_ids" => product_ids
-               }
+               "product_ids" => product_ids
              } = json_response(conn, 200)
 
-      # User should have netflix and spotify from setup
-      assert "netflix" in product_ids
-      assert "spotify" in product_ids
+      # User should have the netflix product UUID from setup
+      [netflix | _] = products
+      assert netflix.id in product_ids
     end
   end
 
-  describe "POST /api/auth/refresh" do
+  describe "POST /api/v1/auth/refresh" do
     setup do
       {:ok, user} =
         Users.register_user(%{
@@ -210,7 +201,7 @@ defmodule BackendWeb.AuthControllerTest do
       conn =
         conn
         |> put_req_header("authorization", "Bearer #{old_token}")
-        |> post(~p"/api/auth/refresh")
+        |> post(~p"/api/v1/auth/refresh")
 
       assert %{"token" => new_token} = json_response(conn, 200)
 
@@ -220,7 +211,7 @@ defmodule BackendWeb.AuthControllerTest do
     end
 
     test "returns error for unauthenticated request", %{conn: conn} do
-      conn = post(conn, ~p"/api/auth/refresh")
+      conn = post(conn, ~p"/api/v1/auth/refresh")
 
       assert json_response(conn, 401)
     end
@@ -229,13 +220,13 @@ defmodule BackendWeb.AuthControllerTest do
       conn =
         conn
         |> put_req_header("authorization", "Bearer invalid-token")
-        |> post(~p"/api/auth/refresh")
+        |> post(~p"/api/v1/auth/refresh")
 
       assert json_response(conn, 401)
     end
   end
 
-  describe "POST /api/auth/logout" do
+  describe "POST /api/v1/auth/logout" do
     setup do
       {:ok, user} =
         Users.register_user(%{
@@ -253,13 +244,13 @@ defmodule BackendWeb.AuthControllerTest do
       conn =
         conn
         |> put_req_header("authorization", "Bearer #{token}")
-        |> post(~p"/api/auth/logout")
+        |> post(~p"/api/v1/auth/logout")
 
       assert %{"message" => "Logged out successfully"} = json_response(conn, 200)
     end
 
     test "returns error for unauthenticated request", %{conn: conn} do
-      conn = post(conn, ~p"/api/auth/logout")
+      conn = post(conn, ~p"/api/v1/auth/logout")
 
       assert json_response(conn, 401)
     end
@@ -268,7 +259,7 @@ defmodule BackendWeb.AuthControllerTest do
       conn =
         conn
         |> put_req_header("authorization", "Bearer invalid-token")
-        |> post(~p"/api/auth/logout")
+        |> post(~p"/api/v1/auth/logout")
 
       assert json_response(conn, 401)
     end
@@ -285,7 +276,7 @@ defmodule BackendWeb.AuthControllerTest do
         "password" => "123"
       }
 
-      conn = post(conn, ~p"/api/auth/register", %{"user" => invalid_params})
+      conn = post(conn, ~p"/api/v1/auth/register", invalid_params)
 
       assert %{
                "error" => "registration_failed",
@@ -313,7 +304,7 @@ defmodule BackendWeb.AuthControllerTest do
         "password" => "SecurePass123!"
       }
 
-      conn1 = post(conn, ~p"/api/auth/register", %{"user" => user_params})
+      conn1 = post(conn, ~p"/api/v1/auth/register", user_params)
       assert %{"token" => _register_token} = json_response(conn1, 201)
 
       # 2. Login (get new token)
@@ -322,14 +313,14 @@ defmodule BackendWeb.AuthControllerTest do
         "password" => "SecurePass123!"
       }
 
-      conn2 = post(conn, ~p"/api/auth/login", login_params)
+      conn2 = post(conn, ~p"/api/v1/auth/login", login_params)
       assert %{"token" => login_token} = json_response(conn2, 200)
 
       # 3. Refresh token
       conn3 =
         conn
         |> put_req_header("authorization", "Bearer #{login_token}")
-        |> post(~p"/api/auth/refresh")
+        |> post(~p"/api/v1/auth/refresh")
 
       assert %{"token" => refresh_token} = json_response(conn3, 200)
       assert refresh_token != login_token
@@ -338,7 +329,7 @@ defmodule BackendWeb.AuthControllerTest do
       conn4 =
         conn
         |> put_req_header("authorization", "Bearer #{refresh_token}")
-        |> post(~p"/api/auth/logout")
+        |> post(~p"/api/v1/auth/logout")
 
       assert %{"message" => "Logged out successfully"} = json_response(conn4, 200)
     end
@@ -350,14 +341,15 @@ defmodule BackendWeb.AuthControllerTest do
     alias Backend.Repo
 
     products = [
-      %{id: Ecto.UUID.generate(), name: "netflix", desciption: "Netflix", price: Decimal.new("75.99")},
-      %{id: Ecto.UUID.generate(), name: "spotify", desciption: "Spotify", price: Decimal.new("45.99")}
+      %{name: "netflix", description: "Netflix", price: Decimal.new("75.99")},
+      %{name: "spotify", description: "Spotify", price: Decimal.new("45.99")}
     ]
 
-    Enum.each(products, fn attrs ->
+    # Return the inserted products, not :ok
+    Enum.map(products, fn attrs ->
       %Product{}
       |> Product.changeset(attrs)
-      |> Repo.insert!(on_conflict: :nothing)
+      |> Repo.insert!()
     end)
   end
 end

@@ -1,6 +1,6 @@
 # Benefits Management Backend API
 
-A Phoenix/Elixir backend API for an application providing user register and authentication, product (benefits) fetching, and order (subscription) management capabilities.
+A Phoenix/Elixir backend API for an application providing user register and authentication, product (benefits) fetching, and order (benefit purchases) management capabilities.
 
 ## The Challenge
 
@@ -313,7 +313,7 @@ Key relationships:
 
 ```bash
 mix test              # Run all tests
-mix test --coverage   # With coverage report
+mix test --cover      # With coverage report
 ```
 
 Tests cover both API versions, ensuring legacy compatibility doesn't break as new features are added.

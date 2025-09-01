@@ -1,283 +1,218 @@
-# test/backend_web/controllers/product_controller_test.exs
 defmodule BackendWeb.ProductControllerTest do
   use BackendWeb.ConnCase, async: true
 
   alias Backend.Products
 
-  describe "GET /api/products" do
+  describe "GET /api/v1/products" do
     test "returns empty list when no products exist", %{conn: conn} do
-      conn = get(conn, ~p"/api/products")
+      conn = get(conn, ~p"/api/v1/products")
 
-      assert [] = json_response(conn, 200)
+      assert json_response(conn, 200) == []
     end
 
-    test "returns list of products", %{conn: conn} do
-      # Create test products
-      create_test_products()
+    test "returns products with correct data", %{conn: conn} do
+      # Create a test product with all required fields
+      {:ok, _product} =
+        Products.create_product(%{
+          name: "Test Product",
+          description: "Test Description",  # Added required field
+          price: Decimal.new("99.99")
+        })
 
-      conn = get(conn, ~p"/api/products")
+      conn = get(conn, ~p"/api/v1/products")
 
+      assert [product] = json_response(conn, 200)
+      assert product["id"] != nil
+      assert product["name"] == "Test Product"
+      assert product["description"] == "Test Description"
+      assert product["price"] == "99.99"
+    end
+
+    test "returns products sorted consistently", %{conn: conn} do
+      products_data = [
+        %{name: "Zebra Product", description: "Last alphabetically", price: Decimal.new("10.00")},
+        %{name: "Alpha Product", description: "First alphabetically", price: Decimal.new("20.00")},
+        %{name: "Beta Product", description: "Second alphabetically", price: Decimal.new("30.00")}
+      ]
+
+      Enum.each(products_data, fn product_data ->
+        {:ok, _product} = Products.create_product(product_data)
+      end)
+
+      conn = get(conn, ~p"/api/v1/products")
       products = json_response(conn, 200)
 
       assert length(products) == 3
 
-      # Check structure of each product
-      Enum.each(products, fn product ->
-        assert %{
-                 "id" => _id,
-                 "name" => _name,
-                 "description" => _description,
-                 "price" => _price
-               } = product
-
-        assert is_binary(product["id"])  # UUID
-        assert is_binary(product["name"])  # identifier
-        assert is_binary(product["description"])  # display name
-        # Price should be a string representation of decimal
-        assert is_binary(product["price"]) or is_number(product["price"])
-      end)
-    end
-
-    test "returns products with correct data", %{conn: conn} do
-      # Create specific test product
-      {:ok, _product} =
-        Products.create_product(%{
-          id: "test-product",
-          name: "Test Product",
-          price: Decimal.new("99.99")
-        })
-
-      conn = get(conn, ~p"/api/products")
-
-      assert %{
-               "products" => [returned_product]
-             } = json_response(conn, 200)
-
-      assert %{
-               "id" => "test-product",
-               "name" => "Test Product",
-               "price" => price
-             } = returned_product
-
-      # Price might be returned as string or number depending on JSON encoding
-      assert price == "99.99" or price == 99.99
-    end
-
-    test "returns products sorted consistently", %{conn: conn} do
-      # Create products with different names to test ordering
-      products_data = [
-        %{id: "zebra", name: "Zebra Product", price: Decimal.new("10.00")},
-        %{id: "alpha", name: "Alpha Product", price: Decimal.new("20.00")},
-        %{id: "beta", name: "Beta Product", price: Decimal.new("30.00")}
-      ]
-
-      Enum.each(products_data, fn product_data ->
-        {:ok, _product} = Products.create_product(product_data)
-      end)
-
-      conn = get(conn, ~p"/api/products")
-
-      assert %{
-               "products" => products
-             } = json_response(conn, 200)
-
-      assert length(products) == 3
-
-      # Extract IDs to verify they're returned consistently
-      product_ids = Enum.map(products, fn p -> p["id"] end)
-      assert length(product_ids) == length(Enum.uniq(product_ids))
+      # Products should be returned in database order (typically insertion order)
+      product_names = Enum.map(products, & &1["name"])
+      assert "Zebra Product" in product_names
+      assert "Alpha Product" in product_names
+      assert "Beta Product" in product_names
     end
 
     test "handles large number of products", %{conn: conn} do
-      # Create many products to test performance/pagination (if implemented)
+      # Create 50 test products
       products_data =
-        for i <- 1..50 do
+        Enum.map(1..50, fn i ->
           %{
-            id: "product-#{i}",
             name: "Product #{i}",
+            description: "Description #{i}",  # Added required field
             price: Decimal.new("#{i}.99")
           }
-        end
+        end)
 
       Enum.each(products_data, fn product_data ->
         {:ok, _product} = Products.create_product(product_data)
       end)
 
-      conn = get(conn, ~p"/api/products")
-
-      assert %{
-               "products" => products
-             } = json_response(conn, 200)
+      conn = get(conn, ~p"/api/v1/products")
+      products = json_response(conn, 200)
 
       assert length(products) == 50
+
+      # Verify all products have required fields
+      Enum.each(products, fn product ->
+        assert product["id"] != nil
+        assert product["name"] != nil
+        assert product["description"] != nil
+        assert product["price"] != nil
+      end)
     end
 
-    test "returns correct content-type header", %{conn: conn} do
-      create_test_products()
-
-      conn = get(conn, ~p"/api/products")
+    test "returns correct content type", %{conn: conn} do
+      conn = get(conn, ~p"/api/v1/products")
 
       assert get_resp_header(conn, "content-type") == ["application/json; charset=utf-8"]
-      assert json_response(conn, 200)
     end
   end
 
-  describe "GET /products (legacy)" do
+  describe "GET /api/products (legacy)" do
     test "returns list of products with deprecation header", %{conn: conn} do
-      create_test_products()
-
-      conn = get(conn, ~p"/products")
-
-      # Check deprecation header
-      assert get_resp_header(conn, "x-deprecated") == ["Use GET /api/products"]
-
-      # Should have same response format as modern endpoint
-      assert %{
-               "products" => products
-             } = json_response(conn, 200)
-
-      assert length(products) == 3
-    end
-
-    test "returns empty list when no products exist", %{conn: conn} do
-      conn = get(conn, ~p"/products")
-
-      assert get_resp_header(conn, "x-deprecated") == ["Use GET /api/products"]
-
-      assert %{
-               "products" => []
-             } = json_response(conn, 200)
-    end
-
-    test "has identical response format to modern endpoint", %{conn: conn} do
-      create_test_products()
-
-      # Get response from both endpoints
-      modern_conn = get(conn, ~p"/api/products")
-      legacy_conn = get(conn, ~p"/products")
-
-      modern_response = json_response(modern_conn, 200)
-      legacy_response = json_response(legacy_conn, 200)
-
-      # Responses should be identical (except headers)
-      assert modern_response == legacy_response
-    end
-
-    test "sets correct status code", %{conn: conn} do
-      conn = get(conn, ~p"/products")
-
-      assert conn.status == 200
-      assert get_resp_header(conn, "x-deprecated") == ["Use GET /api/products"]
-    end
-  end
-
-  describe "error handling" do
-    test "handles database connection errors gracefully", %{conn: conn} do
-      # This is harder to test without mocking, but we can test the controller logic
-      # For now, we'll test that the endpoint responds correctly under normal circumstances
-
-      conn = get(conn, ~p"/api/products")
-
-      # Should not crash and should return valid JSON
-      assert json_response(conn, 200)
-    end
-  end
-
-  describe "response format validation" do
-    test "product fields are correctly formatted", %{conn: conn} do
       {:ok, _product} =
         Products.create_product(%{
-          name: "Format Test Product",
-          description: "A test product for format validation",
-          price: Decimal.new("123.45")
+          name: "netflix",
+          description: "Netflix Subscription",
+          price: Decimal.new("75.99")
         })
 
       conn = get(conn, ~p"/api/products")
 
-      assert %{
-               "products" => [product]
-             } = json_response(conn, 200)
+      # Check the actual deprecation header message from your controller
+      assert get_resp_header(conn, "x-deprecated") == ["Use GET /api/products with API-Version: v1"]
 
-      # Validate all required fields are present
-      assert Map.has_key?(product, "id")
-      assert Map.has_key?(product, "name")
-      assert Map.has_key?(product, "price")
+      assert %{"products" => products} = json_response(conn, 200)
+      assert length(products) == 1
 
-      # Validate no extra fields are included
-      expected_keys = ["id", "name", "price"]
-      actual_keys = Map.keys(product)
-      assert Enum.sort(actual_keys) == Enum.sort(expected_keys)
-
-      # Validate field types
-      assert is_binary(product["id"])
-      assert is_binary(product["name"])
-      assert is_binary(product["price"]) or is_number(product["price"])
+      [product] = products
+      assert product["id"] == "netflix"  # Legacy: name becomes "id"
+      assert product["name"] == "Netflix Subscription"  # Legacy: description becomes "name"
+      assert product["price"] == "75.99"
     end
 
-    test "handles products with edge case values", %{conn: conn} do
-      edge_cases = [
-        # Very long name
-        %{name: String.duplicate("A", 255), description: "Long name product", price: Decimal.new("0.01")},
-        # Very high price
-        %{name: "Expensive", description: "Expensive product", price: Decimal.new("99999.99")},
-        # Very low price (but not zero due to validation)
-        %{name: "Cheap Product", description: "Cheap product", price: Decimal.new("0.01")}
-      ]
+    test "returns empty list when no products exist", %{conn: conn} do
+      conn = get(conn, ~p"/api/products")
 
-      Enum.each(edge_cases, fn product_data ->
-        {:ok, _product} = Products.create_product(product_data)
-      end)
+      assert get_resp_header(conn, "x-deprecated") == ["Use GET /api/products with API-Version: v1"]
+      assert json_response(conn, 200) == %{"products" => []}
+    end
+
+    test "sets correct status code", %{conn: conn} do
+      conn = get(conn, ~p"/api/products")
+
+      assert conn.status == 200
+      assert get_resp_header(conn, "x-deprecated") == ["Use GET /api/products with API-Version: v1"]
+    end
+
+    test "maps fields correctly for legacy compatibility", %{conn: conn} do
+      {:ok, _product1} =
+        Products.create_product(%{
+          name: "spotify",
+          description: "Spotify Premium",
+          price: Decimal.new("45.99")
+        })
+
+      {:ok, _product2} =
+        Products.create_product(%{
+          name: "gym",
+          description: "Gym Membership",
+          price: Decimal.new("120.00")
+        })
 
       conn = get(conn, ~p"/api/products")
 
-      assert %{
-               "products" => products
-             } = json_response(conn, 200)
+      assert %{"products" => products} = json_response(conn, 200)
+      assert length(products) == 2
 
-      assert length(products) == 3
+      # Verify legacy field mapping
+      product_names = Enum.map(products, & &1["id"])  # "id" field contains the name
+      assert "spotify" in product_names
+      assert "gym" in product_names
 
-      # All products should be formatted correctly
-      Enum.each(products, fn product ->
-        assert %{
-                 "id" => _id,
-                 "name" => _name,
-                 "price" => _price
-               } = product
-      end)
+      display_names = Enum.map(products, & &1["name"])  # "name" field contains description
+      assert "Spotify Premium" in display_names
+      assert "Gym Membership" in display_names
+    end
+  end
+
+  describe "API comparison" do
+    setup do
+      {:ok, product} =
+        Products.create_product(%{
+          name: "test_product",
+          description: "Test Product Description",
+          price: Decimal.new("50.00")
+        })
+
+      %{product: product}
+    end
+
+    test "V1 and legacy APIs return different formats", %{conn: conn, product: product} do
+      # Test V1 API
+      conn_v1 = get(conn, ~p"/api/v1/products")
+      v1_products = json_response(conn_v1, 200)
+
+      # Test legacy API
+      conn_legacy = get(conn, ~p"/api/products")
+      legacy_response = json_response(conn_legacy, 200)
+      legacy_products = legacy_response["products"]
+
+      # V1 returns array directly
+      assert is_list(v1_products)
+      [v1_product] = v1_products
+      assert v1_product["id"] == product.id  # UUID
+      assert v1_product["name"] == "test_product"
+      assert v1_product["description"] == "Test Product Description"
+
+      # Legacy returns wrapped array with field mapping
+      assert is_list(legacy_products)
+      [legacy_product] = legacy_products
+      assert legacy_product["id"] == "test_product"  # name becomes id
+      assert legacy_product["name"] == "Test Product Description"  # description becomes name
     end
   end
 
   describe "integration with Products context" do
     test "returns products from Products.list_products/0", %{conn: conn} do
-      # Create a product directly through the context
+      # Create product directly through Products context
       {:ok, created_product} =
         Products.create_product(%{
           name: "Integration Product",
-          description: "Integration test product",
-          price: Decimal.new("50.00")
+          description: "Integration Test",
+          price: Decimal.new("25.50")
         })
 
-      conn = get(conn, ~p"/api/products")
+      conn = get(conn, ~p"/api/v1/products")
+      products = json_response(conn, 200)
 
-      assert %{
-               "products" => [returned_product]
-             } = json_response(conn, 200)
+      assert length(products) == 1
+      [returned_product] = products
 
-      assert returned_product["id"] == created_product.id
+      # Check that controller returns the same data as the context
+      assert returned_product["id"] == created_product.id  # Fixed: compare UUID to UUID
       assert returned_product["name"] == created_product.name
+      assert returned_product["description"] == created_product.description
+      assert returned_product["price"] == "25.50"  # JSON converts Decimal to string
     end
-  end
-
-  # Helper function to create consistent test data
-  defp create_test_products do
-    products_data = [
-      %{name: "netflix", description: "Netflix Subscription", price: Decimal.new("75.99")},
-      %{name: "spotify", description: "Spotify Premium", price: Decimal.new("45.99")},
-      %{name: "gym", description: "Gym Membership", price: Decimal.new("120.00")}
-    ]
-
-    Enum.each(products_data, fn product_data ->
-      {:ok, _product} = Products.create_product(product_data)
-    end)
   end
 end

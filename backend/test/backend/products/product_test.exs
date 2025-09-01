@@ -1,4 +1,4 @@
-defmodule Backend.ProductsTest do
+defmodule Backend.ProductTest do
   use Backend.DataCase, async: false  # Changed to false due to shared data issues
 
   alias Backend.Products

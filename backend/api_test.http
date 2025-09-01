@@ -1,0 +1,166 @@
+@host = http://localhost:4000
+@contentType = application/json
+@password = Secret123
+@username = tester_{{$uuid}}
+@email = tester_{{$timestamp}}@example.com
+
+### 1) Register a new user
+POST {{host}}/api/v1/auth/register
+Content-Type: {{contentType}}
+
+{
+  "username": "{{username}}",
+  "email": "{{email}}",
+  "password": "{{password}}"
+}
+
+> {%
+    client.test("Register returns 201 and token", function() {
+        client.assert(response.status === 201, `Expected 201, got ${response.status}`);
+        client.assert(!!response.body.token, "Token missing in register response");
+
+        // Save the registration token
+        client.global.set("register_token", response.body.token);
+        client.log(`Registered user: {{username}} / {{email}}`);
+    });
+%}
+
+### 2) Login with that user
+POST {{host}}/api/v1/auth/login
+Content-Type: {{contentType}}
+
+{
+  "username": "{{username}}",
+  "password": "{{password}}"
+}
+
+> {%
+    client.test("Login returns 200 and token", function() {
+        client.assert(response.status === 200, `Expected 200, got ${response.status}`);
+        client.assert(!!response.body.token, "Token missing in login response");
+
+        // Save the login token for subsequent requests
+        client.global.set("auth_token", response.body.token);
+        client.log(`Login successful, token saved`);
+    });
+%}
+
+### 3) Public: list products
+GET {{host}}/api/v1/products
+Accept: application/json
+
+> {%
+    client.test("Products endpoint returns 200 with products array", function() {
+        client.assert(response.status === 200, `Expected 200, got ${response.status}`);
+        client.assert(Array.isArray(response.body), "Response should be products array");
+
+        const products = response.body;
+        client.assert(products.length > 0, "Should have at least one product");
+
+        // Save first two product IDs for order test
+        if (products.length >= 2) {
+            client.global.set("product_id1", products[0].id);
+            client.global.set("product_id2", products[1].id);
+            client.log(`Captured product IDs: ${products[0].id}, ${products[1].id}`);
+        }
+    });
+%}
+
+### 4) Authenticated: get current user
+GET {{host}}/api/v1/users/me
+Accept: application/json
+Authorization: Bearer {{auth_token}}
+
+> {%
+    client.test("Me returns 200 with profile fields", function() {
+        client.assert(response.status === 200, `Expected 200, got ${response.status}`);
+        client.assert(response.body.email != null, "Email missing on /me");
+        client.assert(response.body.balance != null, "Balance missing on /me");
+        client.assert(Array.isArray(response.body.product_ids), "product_ids should be array on /me");
+
+        client.log(`User balance: ${response.body.balance}, products owned: ${response.body.product_ids.length}`);
+    });
+%}
+
+### 5) Authenticated: create an order with captured product IDs
+POST {{host}}/api/v1/orders
+Content-Type: {{contentType}}
+Authorization: Bearer {{auth_token}}
+
+{
+  "items": [
+    "{{product_id1}}",
+    "{{product_id2}}"
+  ]
+}
+
+> {%
+    client.test("Create order returns 200 with order structure", function() {
+        client.assert(response.status === 200, `Expected 200, got ${response.status}`);
+        client.assert(!!response.body.id, "Order id missing");
+        client.assert(Array.isArray(response.body.items), "Order items should be an array");
+        client.assert(response.body.total != null, "Order total missing");
+        client.assert(response.body.created_at != null, "Order created_at missing");
+
+        if (Array.isArray(response.body.items) && response.body.items.length > 0) {
+            const item = response.body.items[0];
+            client.assert(!!item.id, "Order item id missing");
+            client.assert(!!item.name, "Order item name missing");
+            client.assert(!!item.description, "Order item description missing");
+            client.assert(item.price != null, "Order item price missing");
+        }
+
+        // Save order ID for potential future use
+        client.global.set("order_id", response.body.id);
+        client.log(`Order created: ${response.body.id}, total: ${response.body.total}`);
+    });
+%}
+
+### 6) Authenticated: refresh token
+POST {{host}}/api/v1/auth/refresh
+Accept: application/json
+Authorization: Bearer {{auth_token}}
+
+> {%
+    client.test("Refresh returns 200 and new token", function() {
+        client.assert(response.status === 200, `Expected 200, got ${response.status}`);
+        client.assert(!!response.body.token, "Token missing on refresh");
+
+        // Update the auth token with the refreshed one
+        client.global.set("auth_token", response.body.token);
+        client.log("Token refreshed successfully");
+    });
+%}
+
+### 6.1) Authenticated: get current user again (purchased products should be present)
+GET {{host}}/api/v1/users/me
+Accept: application/json
+Authorization: Bearer {{auth_token}}
+
+> {%
+    client.test("Me after order contains purchased products", function() {
+        client.assert(response.status === 200, `Expected 200, got ${response.status}`);
+        client.assert(Array.isArray(response.body.product_ids), "product_ids should be array");
+
+        const productIds = response.body.product_ids;
+        client.assert(productIds.length >= 2, "Should have at least 2 products after order");
+
+        client.log(`User now owns ${productIds.length} products`);
+    });
+%}
+
+### 7) Authenticated: logout
+POST {{host}}/api/v1/auth/logout
+Accept: application/json
+Authorization: Bearer {{auth_token}}
+
+> {%
+    client.test("Logout returns 200 and message", function() {
+        client.assert(response.status === 200, `Expected 200, got ${response.status}`);
+        client.assert(!!response.body.message, "Logout message missing");
+
+        // Clear the auth token after logout
+        client.global.clear("auth_token");
+        client.log("Logout successful, token cleared");
+    });
+%}

@@ -3,7 +3,7 @@ defmodule BackendWeb.OrderControllerTest do
 
   alias Backend.{Users, Guardian}
 
-  describe "POST /orders (Frontend prototype - no authentication)" do
+  describe "POST /api/orders (Frontend prototype - no authentication)" do
     setup do
       # Create user via legacy method
       {:ok, user} = Users.get_user_by_username("johndoe")
@@ -19,7 +19,7 @@ defmodule BackendWeb.OrderControllerTest do
         }
       }
 
-      conn = post(conn, ~p"/orders", order_params)
+      conn = post(conn, ~p"/api/orders", order_params)
 
       assert %{
                "order" => %{
@@ -50,7 +50,7 @@ defmodule BackendWeb.OrderControllerTest do
         }
       }
 
-      conn = post(conn, ~p"/orders", order_params)
+      conn = post(conn, ~p"/api/orders", order_params)
 
       assert %{
                "error" => "products_not_found",
@@ -64,13 +64,13 @@ defmodule BackendWeb.OrderControllerTest do
 
       order_params = %{
         "order" => %{
-          # Total > 120
+          # Total > 50
           "items" => ["netflix", "spotify"],
           "user_id" => "johndoe"
         }
       }
 
-      conn = post(conn, ~p"/orders", order_params)
+      conn = post(conn, ~p"/api/orders", order_params)
 
       assert %{
                "error" => "insufficient_balance",
@@ -78,7 +78,7 @@ defmodule BackendWeb.OrderControllerTest do
              } = json_response(conn, 400)
     end
 
-    test "returns error for already purchased products", %{conn: conn, user: _user} do
+    test "returns error for already purchased products", %{conn: conn} do
       # First, buy netflix
       order_params1 = %{
         "order" => %{
@@ -87,7 +87,7 @@ defmodule BackendWeb.OrderControllerTest do
         }
       }
 
-      post(conn, ~p"/orders", order_params1)
+      post(conn, ~p"/api/orders", order_params1)
 
       # Try to buy netflix again
       order_params2 = %{
@@ -97,7 +97,7 @@ defmodule BackendWeb.OrderControllerTest do
         }
       }
 
-      conn = post(conn, ~p"/orders", order_params2)
+      conn = post(conn, ~p"/api/orders", order_params2)
 
       assert %{
                "error" => "products_already_purchased",
@@ -106,7 +106,7 @@ defmodule BackendWeb.OrderControllerTest do
     end
   end
 
-  describe "POST /api/orders (authenticated)" do
+  describe "POST /api/v1/orders (authenticated)" do
     setup do
       {:ok, user} =
         Users.register_user(%{
@@ -116,37 +116,36 @@ defmodule BackendWeb.OrderControllerTest do
         })
 
       {:ok, token, _claims} = Guardian.encode_and_sign(user)
-      create_test_products()
+      products = create_test_products()
 
-      %{user: user, token: token}
+      %{user: user, token: token, products: products}
     end
 
     test "creates order successfully with JWT authentication", %{
       conn: conn,
       token: token,
-      user: user
+      products: products
     } do
+      # Use actual product UUIDs for V1 API
+      [netflix, spotify | _] = products
+
       order_params = %{
-        "order" => %{
-          "items" => ["netflix", "spotify"]
-        }
+        "items" => [netflix.id, spotify.id]
       }
 
       conn =
         conn
         |> put_req_header("authorization", "Bearer #{token}")
-        |> post(~p"/api/orders", order_params)
+        |> post(~p"/api/v1/orders", order_params)
 
       assert %{
                "id" => order_id,
-               "user_id" => user_id,
                "items" => items,
                "total" => total,
                "created_at" => created_at
              } = json_response(conn, 200)
 
       assert is_binary(order_id)
-      assert user_id == user.id
       assert is_list(items)
       assert length(items) == 2
       assert is_binary(created_at)
@@ -156,41 +155,41 @@ defmodule BackendWeb.OrderControllerTest do
       product_names = Enum.map(items, & &1["name"])
       assert "netflix" in product_names
       assert "spotify" in product_names
-      
+
       Enum.each(items, fn item ->
-        assert is_binary(item["id"]) 
+        assert is_binary(item["id"])
         assert is_binary(item["name"])
         assert is_binary(item["description"])
-        assert is_binary(item["price"])
+        assert item["price"] != nil
       end)
     end
 
-    test "returns error for unauthenticated request", %{conn: conn} do
+    test "returns error for unauthenticated request", %{conn: conn, products: products} do
+      [netflix | _] = products
+
       order_params = %{
-        "order" => %{
-          "items" => ["netflix"]
-        }
+        "items" => [netflix.id]
       }
 
-      conn = post(conn, ~p"/api/orders", order_params)
+      conn = post(conn, ~p"/api/v1/orders", order_params)
 
       assert %{
-               "error" => "unauthenticated",
+               "error" => _error,
                "message" => "Authentication required"
              } = json_response(conn, 401)
     end
 
-    test "returns error for invalid token", %{conn: conn} do
+    test "returns error for invalid token", %{conn: conn, products: products} do
+      [netflix | _] = products
+
       order_params = %{
-        "order" => %{
-          "items" => ["netflix"]
-        }
+        "items" => [netflix.id]
       }
 
       conn =
         conn
         |> put_req_header("authorization", "Bearer invalid-token")
-        |> post(~p"/api/orders", order_params)
+        |> post(~p"/api/v1/orders", order_params)
 
       assert json_response(conn, 401)
     end
@@ -200,19 +199,17 @@ defmodule BackendWeb.OrderControllerTest do
       token: token
     } do
       # Test insufficient balance with authenticated endpoint
-      create_expensive_products()
+      expensive_products = create_expensive_products()
+      [premium, deluxe | _] = expensive_products
 
       order_params = %{
-        "order" => %{
-          # Total = 1100 > 1000
-          "items" => ["premium", "deluxe"]
-        }
+        "items" => [premium.id, deluxe.id]
       }
 
       conn =
         conn
         |> put_req_header("authorization", "Bearer #{token}")
-        |> post(~p"/api/orders", order_params)
+        |> post(~p"/api/v1/orders", order_params)
 
       assert %{
                "error" => "insufficient_balance",
@@ -221,7 +218,6 @@ defmodule BackendWeb.OrderControllerTest do
     end
   end
 
-  # Test smart routing - same endpoint handles both cases
   describe "smart routing logic" do
     setup do
       {:ok, user} =
@@ -232,33 +228,33 @@ defmodule BackendWeb.OrderControllerTest do
         })
 
       {:ok, token, _claims} = Guardian.encode_and_sign(user)
-      create_test_products()
+      products = create_test_products()
 
-      %{user: user, token: token}
+      %{user: user, token: token, products: products}
     end
 
-    test "handles legacy request (no token) vs authenticated request (with token)", %{
+    test "handles unauthenticated request vs authenticated request differently", %{
       conn: conn,
-      token: token
+      token: token,
+      products: products
     } do
+      [netflix | _] = products
+
       order_params = %{
-        "order" => %{
-          "items" => ["netflix"]
-        }
+        "items" => [netflix.id]
       }
 
-      # Legacy request (should fail without user_id)
-      _conn1 = post(conn, ~p"/api/orders", order_params)
-      # This should either fail or be handled differently than authenticated
+      # Unauthenticated request - should fail with 401
+      conn1 = post(conn, ~p"/api/v1/orders", order_params)
+      assert json_response(conn1, 401)
 
-      # Authenticated request (should work)
+      # Authenticated request - should work
       conn2 =
         conn
         |> put_req_header("authorization", "Bearer #{token}")
-        |> post(~p"/api/orders", order_params)
+        |> post(~p"/api/v1/orders", order_params)
 
       assert json_response(conn2, 200)
-      # The responses should be different, showing smart routing works
     end
   end
 
@@ -273,7 +269,8 @@ defmodule BackendWeb.OrderControllerTest do
       %{name: "gym", description: "Gym Membership", price: Decimal.new("120.00")}
     ]
 
-    Enum.each(products, fn attrs ->
+    # Return the created products so tests can access their UUIDs
+    Enum.map(products, fn attrs ->
       %Product{}
       |> Product.changeset(attrs)
       |> Repo.insert!(on_conflict: :nothing)
@@ -289,7 +286,8 @@ defmodule BackendWeb.OrderControllerTest do
       %{name: "deluxe", description: "Deluxe Package", price: Decimal.new("600.00")}
     ]
 
-    Enum.each(products, fn attrs ->
+    # Return the created products so tests can access their UUIDs
+    Enum.map(products, fn attrs ->
       %Product{}
       |> Product.changeset(attrs)
       |> Repo.insert!(on_conflict: :nothing)

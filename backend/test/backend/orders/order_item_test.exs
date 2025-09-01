@@ -314,7 +314,7 @@ defmodule Backend.Orders.OrderItemTest do
 
   describe "schema associations" do
     test "has correct associations defined" do
-      order_item = %OrderItem{}
+      _order_item = %OrderItem{}
 
       assert %Ecto.Association.BelongsTo{} = OrderItem.__schema__(:association, :order)
       assert %Ecto.Association.BelongsTo{} = OrderItem.__schema__(:association, :product)
@@ -342,7 +342,7 @@ defmodule Backend.Orders.OrderItemTest do
     end
 
     test "product association uses binary_id type" do
-      product_assoc = OrderItem.__schema__(:association, :product)
+      _product_assoc = OrderItem.__schema__(:association, :product)
       # Check that the product_id field type matches the product's binary_id type
       assert OrderItem.__schema__(:type, :product_id) == :binary_id
     end
