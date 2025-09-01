@@ -121,10 +121,10 @@ POST /api/orders                 # Uses product names, not UUIDs
 // GET /api/users/john_doe
 {
   "user": {
-    "user_id": "john_doe",
+    "user_id": "johndoe",
     "data": {
       "balance": "1000.00",
-      "product_ids": []
+      "product_ids": ["netflix"]
     }
   }
 }
@@ -133,8 +133,8 @@ POST /api/orders                 # Uses product names, not UUIDs
 {
   "products": [
     {
-      "id": "Netflix Premium",
-      "name": "Stream unlimited movies and TV shows",
+      "id": "netflix",
+      "name": "Netflix Premium",
       "price": "15.99"
     }
   ]
@@ -147,8 +147,8 @@ POST /api/orders                 # Uses product names, not UUIDs
     "data": {
       "items": [
         {
-          "id": "Netflix Premium",
-          "name": "Stream unlimited movies and TV shows",
+          "id": "netflix",
+          "name": "Netflix Premium",
           "price": "15.99"
         }
       ],
@@ -192,8 +192,8 @@ POST /api/v1/orders              # Authenticated orders
 [
   {
     "id": "550e8400-e29b-41d4-a716-446655440000",
-    "name": "Netflix Premium",
-    "description": "Stream unlimited movies and TV shows",
+    "name": "netflix",
+    "description": "Netflix Premium",
     "price": "15.99"
   }
 ]
@@ -212,8 +212,8 @@ POST /api/v1/orders              # Authenticated orders
   "items": [
     {
       "id": "550e8400-e29b-41d4-a716-446655440000",
-      "name": "Netflix Premium",
-      "description": "Stream unlimited movies and TV shows",
+      "name": "netflix",
+      "description": "Netflix Premium",
       "price": "15.99"
     }
   ],
