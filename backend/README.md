@@ -22,46 +22,10 @@ The challenge required building an API for an existing React frontend prototype 
 - **Inconsistent data formats** - product names used as IDs
 - **REST inconsistency** - GET endpoints used for creating data
 
-## Upgraded API Version
+## Entities and API Design
+### Data Model
 
-This API addresses the limitations while still maintaining backwards compatibility for the Frontend prototype.
-
-### API Overview
-
-```mermaid
-graph LR
-    Frontend[React Frontend<br/>Prototype] -->|/api/*| Legacy[Legacy API<br/>Compatible]
-    NewClient[New Client] -->|/api/v1/*| Enhanced[Enhanced API<br/>JWT Auth]
-    
-    Legacy --> Controllers[Controllers Layer<br/>- UserController<br/>- ProductController<br/>- OrderController<br/>- AuthController]
-    Enhanced --> Controllers
-    Controllers --> Contexts[Business Logic<br/>- Backend.Users<br/>- Backend.Products<br/>- Backend.Orders]
-    Contexts --> DB[(PostgreSQL<br/>Database)]
-    
-    style Legacy fill:#ffeb3b
-    style Enhanced fill:#4caf50
-    style Contexts fill:#2196f3
-```
-
-### Frontend Prototype API (`/api/*`)
-```
-GET /api/users/john_doe          # No auth required, creates user if missing
-GET /api/products                # Returns products with names as IDs  
-POST /api/orders                 # Uses product names, not UUIDs
-```
-
-### New Endpoints (`/api/v1/*`)
-```
-POST /api/v1/auth/register       # User registration
-POST /api/v1/auth/login          # JWT authentication
-GET /api/v1/products             # UUID-based products
-GET /api/v1/users/me             # User fetching
-POST /api/v1/orders              # Authenticated orders
-```
-
-## Data Model
-
-### Entities
+#### Entities
 - **User**: Account with balance and authentication credentials
 - **Product**: Benefit with pricing (Netflix, Spotify, etc.)
 - **Order**: Purchase transaction with total amount
@@ -122,6 +86,143 @@ erDiagram
     }
 ```
 
+### Upgraded API Version
+
+This API addresses the limitations while still maintaining backwards compatibility for the Frontend prototype.
+
+#### API Overview
+
+```mermaid
+graph LR
+    Frontend[React Frontend<br/>Prototype] -->|/api/*| Legacy[Legacy API<br/>Compatible]
+    NewClient[New Client] -->|/api/v1/*| Enhanced[Enhanced API<br/>JWT Auth]
+    
+    Legacy --> Controllers[Controllers Layer<br/>- UserController<br/>- ProductController<br/>- OrderController<br/>- AuthController]
+    Enhanced --> Controllers
+    Controllers --> Contexts[Business Logic<br/>- Backend.Users<br/>- Backend.Products<br/>- Backend.Orders]
+    Contexts --> DB[(PostgreSQL<br/>Database)]
+    
+    style Legacy fill:#ffeb3b
+    style Enhanced fill:#4caf50
+    style Contexts fill:#2196f3
+```
+
+#### Frontend Prototype API (`/api/*`)
+```
+GET /api/users/john_doe          # No auth required, creates user if missing
+GET /api/products                # Returns products with names as IDs  
+POST /api/orders                 # Uses product names, not UUIDs
+```
+
+<details>
+<summary>Response Examples</summary>
+
+```json
+// GET /api/users/john_doe
+{
+  "user": {
+    "user_id": "john_doe",
+    "data": {
+      "balance": "1000.00",
+      "product_ids": []
+    }
+  }
+}
+
+// GET /api/products  
+{
+  "products": [
+    {
+      "id": "Netflix Premium",
+      "name": "Stream unlimited movies and TV shows",
+      "price": "15.99"
+    }
+  ]
+}
+
+// POST /api/orders
+{
+  "order": {
+    "order_id": "550e8400-e29b-41d4-a716-446655440000",
+    "data": {
+      "items": [
+        {
+          "id": "Netflix Premium",
+          "name": "Stream unlimited movies and TV shows",
+          "price": "15.99"
+        }
+      ],
+      "total": "15.99"
+    }
+  }
+}
+```
+</details>
+
+#### New Endpoints (`/api/v1/*`)
+```
+POST /api/v1/auth/register       # User registration
+POST /api/v1/auth/login          # JWT authentication
+GET /api/v1/products             # UUID-based products
+GET /api/v1/users/me             # User fetching
+POST /api/v1/orders              # Authenticated orders
+```
+
+<details>
+<summary>Response Examples</summary>
+
+```json
+// POST /api/v1/auth/register
+{
+  "username": "john_doe",
+  "email": "john@example.com",
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+
+// POST /api/v1/auth/login  
+{
+  "username": "john_doe",
+  "email": "john@example.com", 
+  "balance": "1000.00",
+  "product_ids": [],
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+
+// GET /api/v1/products
+[
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "name": "Netflix Premium",
+    "description": "Stream unlimited movies and TV shows",
+    "price": "15.99"
+  }
+]
+
+// GET /api/v1/users/me
+{
+  "username": "john_doe",
+  "email": "john@example.com",
+  "balance": "984.01",
+  "product_ids": ["550e8400-e29b-41d4-a716-446655440000"]
+}
+
+// POST /api/v1/orders
+{
+  "id": "550e8400-e29b-41d4-a716-446655440002",
+  "items": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "name": "Netflix Premium",
+      "description": "Stream unlimited movies and TV shows",
+      "price": "15.99"
+    }
+  ],
+  "total": "15.99",
+  "created_at": "2024-01-15T10:30:00.000000Z"
+}
+```
+</details>
+
 ## Development Setup
 
 ### Requirements
@@ -173,6 +274,7 @@ For manual API testing, use the provided HTTP file `api_test.http`:
 - Single currency (EUR) with 2 decimal precision for financial accuracy
 - One-time purchases only - users can't buy the same product twice
 - Static product catalog - products are seeded, not dynamically created yet
+- All products are available for purchase by all users
 - Default user balance of €1000.00 virtual currency for new accounts
 
 **Legacy Compatibility**
