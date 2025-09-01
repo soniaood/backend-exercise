@@ -15,7 +15,8 @@ defmodule BackendWeb.ProductControllerTest do
       {:ok, _product} =
         Products.create_product(%{
           name: "Test Product",
-          description: "Test Description",  # Added required field
+          # Added required field
+          description: "Test Description",
           price: Decimal.new("99.99")
         })
 
@@ -31,7 +32,11 @@ defmodule BackendWeb.ProductControllerTest do
     test "returns products sorted consistently", %{conn: conn} do
       products_data = [
         %{name: "Zebra Product", description: "Last alphabetically", price: Decimal.new("10.00")},
-        %{name: "Alpha Product", description: "First alphabetically", price: Decimal.new("20.00")},
+        %{
+          name: "Alpha Product",
+          description: "First alphabetically",
+          price: Decimal.new("20.00")
+        },
         %{name: "Beta Product", description: "Second alphabetically", price: Decimal.new("30.00")}
       ]
 
@@ -57,7 +62,8 @@ defmodule BackendWeb.ProductControllerTest do
         Enum.map(1..50, fn i ->
           %{
             name: "Product #{i}",
-            description: "Description #{i}",  # Added required field
+            # Added required field
+            description: "Description #{i}",
             price: Decimal.new("#{i}.99")
           }
         end)
@@ -99,21 +105,28 @@ defmodule BackendWeb.ProductControllerTest do
       conn = get(conn, ~p"/api/products")
 
       # Check the actual deprecation header message from your controller
-      assert get_resp_header(conn, "x-deprecated") == ["Use GET /api/products with API-Version: v1"]
+      assert get_resp_header(conn, "x-deprecated") == [
+               "Use GET /api/products with API-Version: v1"
+             ]
 
       assert %{"products" => products} = json_response(conn, 200)
       assert length(products) == 1
 
       [product] = products
-      assert product["id"] == "netflix"  # Legacy: name becomes "id"
-      assert product["name"] == "Netflix Subscription"  # Legacy: description becomes "name"
+      # Legacy: name becomes "id"
+      assert product["id"] == "netflix"
+      # Legacy: description becomes "name"
+      assert product["name"] == "Netflix Subscription"
       assert product["price"] == "75.99"
     end
 
     test "returns empty list when no products exist", %{conn: conn} do
       conn = get(conn, ~p"/api/products")
 
-      assert get_resp_header(conn, "x-deprecated") == ["Use GET /api/products with API-Version: v1"]
+      assert get_resp_header(conn, "x-deprecated") == [
+               "Use GET /api/products with API-Version: v1"
+             ]
+
       assert json_response(conn, 200) == %{"products" => []}
     end
 
@@ -121,7 +134,10 @@ defmodule BackendWeb.ProductControllerTest do
       conn = get(conn, ~p"/api/products")
 
       assert conn.status == 200
-      assert get_resp_header(conn, "x-deprecated") == ["Use GET /api/products with API-Version: v1"]
+
+      assert get_resp_header(conn, "x-deprecated") == [
+               "Use GET /api/products with API-Version: v1"
+             ]
     end
 
     test "maps fields correctly for legacy compatibility", %{conn: conn} do
@@ -145,11 +161,13 @@ defmodule BackendWeb.ProductControllerTest do
       assert length(products) == 2
 
       # Verify legacy field mapping
-      product_names = Enum.map(products, & &1["id"])  # "id" field contains the name
+      # "id" field contains the name
+      product_names = Enum.map(products, & &1["id"])
       assert "spotify" in product_names
       assert "gym" in product_names
 
-      display_names = Enum.map(products, & &1["name"])  # "name" field contains description
+      # "name" field contains description
+      display_names = Enum.map(products, & &1["name"])
       assert "Spotify Premium" in display_names
       assert "Gym Membership" in display_names
     end
@@ -180,15 +198,18 @@ defmodule BackendWeb.ProductControllerTest do
       # V1 returns array directly
       assert is_list(v1_products)
       [v1_product] = v1_products
-      assert v1_product["id"] == product.id  # UUID
+      # UUID
+      assert v1_product["id"] == product.id
       assert v1_product["name"] == "test_product"
       assert v1_product["description"] == "Test Product Description"
 
       # Legacy returns wrapped array with field mapping
       assert is_list(legacy_products)
       [legacy_product] = legacy_products
-      assert legacy_product["id"] == "test_product"  # name becomes id
-      assert legacy_product["name"] == "Test Product Description"  # description becomes name
+      # name becomes id
+      assert legacy_product["id"] == "test_product"
+      # description becomes name
+      assert legacy_product["name"] == "Test Product Description"
     end
   end
 
@@ -209,10 +230,12 @@ defmodule BackendWeb.ProductControllerTest do
       [returned_product] = products
 
       # Check that controller returns the same data as the context
-      assert returned_product["id"] == created_product.id  # Fixed: compare UUID to UUID
+      # Fixed: compare UUID to UUID
+      assert returned_product["id"] == created_product.id
       assert returned_product["name"] == created_product.name
       assert returned_product["description"] == created_product.description
-      assert returned_product["price"] == "25.50"  # JSON converts Decimal to string
+      # JSON converts Decimal to string
+      assert returned_product["price"] == "25.50"
     end
   end
 end

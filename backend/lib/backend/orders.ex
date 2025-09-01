@@ -82,19 +82,26 @@ defmodule Backend.Orders do
   end
 
   defp add_order_items_creation_step(multi) do
-    Multi.run(multi, :order_items, fn _repo, %{order: order, validate_balance: {products, _total}} ->
+    Multi.run(multi, :order_items, fn _repo,
+                                      %{order: order, validate_balance: {products, _total}} ->
       create_order_items(order.id, products)
     end)
   end
 
   defp add_user_products_creation_step(multi) do
-    Multi.run(multi, :user_products, fn _repo, %{user: user, order: order, validate_balance: {products, _total}} ->
+    Multi.run(multi, :user_products, fn _repo,
+                                        %{
+                                          user: user,
+                                          order: order,
+                                          validate_balance: {products, _total}
+                                        } ->
       create_user_products(user.id, products, order.id)
     end)
   end
 
   defp add_balance_update_step(multi) do
-    Multi.run(multi, :update_balance, fn _repo, %{user: user, validate_balance: {_products, total}} ->
+    Multi.run(multi, :update_balance, fn _repo,
+                                         %{user: user, validate_balance: {_products, total}} ->
       update_user_balance(user, total)
     end)
   end
@@ -104,10 +111,13 @@ defmodule Backend.Orders do
     cond do
       is_nil(product_ids) or product_ids == [] ->
         {:error, :empty_product_list}
+
       !is_list(product_ids) ->
         {:error, :invalid_product_list}
+
       product_ids != Enum.uniq(product_ids) ->
         {:error, :duplicate_products_in_request}
+
       true ->
         {:ok, product_ids}
     end
@@ -124,7 +134,7 @@ defmodule Backend.Orders do
     products = Products.get_products_by_ids(product_ids)
     found_ids = Enum.map(products, & &1.id) |> MapSet.new()
     requested_ids = MapSet.new(product_ids)
-    
+
     if MapSet.equal?(found_ids, requested_ids) do
       {:ok, products}
     else
@@ -145,7 +155,7 @@ defmodule Backend.Orders do
 
   defp validate_user_balance(user, products) do
     total = calculate_total_price(products)
-    
+
     if Decimal.compare(user.balance, total) != :lt do
       {:ok, {products, total}}
     else
@@ -161,16 +171,17 @@ defmodule Backend.Orders do
 
   defp create_order_items(order_id, products) do
     timestamp = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
-    
-    order_items = Enum.map(products, fn product ->
-      %{
-        order_id: order_id,
-        product_id: product.id,
-        price: product.price,
-        inserted_at: timestamp,
-        updated_at: timestamp
-      }
-    end)
+
+    order_items =
+      Enum.map(products, fn product ->
+        %{
+          order_id: order_id,
+          product_id: product.id,
+          price: product.price,
+          inserted_at: timestamp,
+          updated_at: timestamp
+        }
+      end)
 
     {count, _} = Repo.insert_all(OrderItem, order_items)
     {:ok, count}

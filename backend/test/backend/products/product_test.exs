@@ -1,5 +1,6 @@
 defmodule Backend.ProductTest do
-  use Backend.DataCase, async: false  # Changed to false due to shared data issues
+  # Changed to false due to shared data issues
+  use Backend.DataCase, async: false
 
   alias Backend.Products
   alias Backend.Products.Product
@@ -17,10 +18,18 @@ defmodule Backend.ProductTest do
   describe "list_products/0" do
     test "returns all products" do
       {:ok, product1} =
-        Repo.insert(%Product{name: "product1", description: "Product 1", price: Decimal.new("10.00")})
+        Repo.insert(%Product{
+          name: "product1",
+          description: "Product 1",
+          price: Decimal.new("10.00")
+        })
 
       {:ok, product2} =
-        Repo.insert(%Product{name: "product2", description: "Product 2", price: Decimal.new("20.00")})
+        Repo.insert(%Product{
+          name: "product2",
+          description: "Product 2",
+          price: Decimal.new("20.00")
+        })
 
       products = Products.list_products()
 
@@ -36,10 +45,18 @@ defmodule Backend.ProductTest do
 
     test "returns products in consistent order" do
       {:ok, _product1} =
-        Repo.insert(%Product{name: "first", description: "First Product", price: Decimal.new("10.00")})
+        Repo.insert(%Product{
+          name: "first",
+          description: "First Product",
+          price: Decimal.new("10.00")
+        })
 
       {:ok, _product2} =
-        Repo.insert(%Product{name: "second", description: "Second Product", price: Decimal.new("20.00")})
+        Repo.insert(%Product{
+          name: "second",
+          description: "Second Product",
+          price: Decimal.new("20.00")
+        })
 
       products = Products.list_products()
 
@@ -55,13 +72,25 @@ defmodule Backend.ProductTest do
   describe "get_products_by_ids/1" do
     setup do
       {:ok, product1} =
-        Repo.insert(%Product{name: "product1", description: "Product 1", price: Decimal.new("10.00")})
+        Repo.insert(%Product{
+          name: "product1",
+          description: "Product 1",
+          price: Decimal.new("10.00")
+        })
 
       {:ok, product2} =
-        Repo.insert(%Product{name: "product2", description: "Product 2", price: Decimal.new("20.00")})
+        Repo.insert(%Product{
+          name: "product2",
+          description: "Product 2",
+          price: Decimal.new("20.00")
+        })
 
       {:ok, product3} =
-        Repo.insert(%Product{name: "product3", description: "Product 3", price: Decimal.new("30.00")})
+        Repo.insert(%Product{
+          name: "product3",
+          description: "Product 3",
+          price: Decimal.new("30.00")
+        })
 
       %{product1: product1, product2: product2, product3: product3}
     end
@@ -112,13 +141,25 @@ defmodule Backend.ProductTest do
   describe "get_products_by_names/1" do
     setup do
       {:ok, product1} =
-        Repo.insert(%Product{name: "test_netflix", description: "Netflix Subscription", price: Decimal.new("75.99")})
+        Repo.insert(%Product{
+          name: "test_netflix",
+          description: "Netflix Subscription",
+          price: Decimal.new("75.99")
+        })
 
       {:ok, product2} =
-        Repo.insert(%Product{name: "test_spotify", description: "Spotify Premium", price: Decimal.new("45.99")})
+        Repo.insert(%Product{
+          name: "test_spotify",
+          description: "Spotify Premium",
+          price: Decimal.new("45.99")
+        })
 
       {:ok, product3} =
-        Repo.insert(%Product{name: "test_gym", description: "Gym Membership", price: Decimal.new("120.00")})
+        Repo.insert(%Product{
+          name: "test_gym",
+          description: "Gym Membership",
+          price: Decimal.new("120.00")
+        })
 
       %{product1: product1, product2: product2, product3: product3}
     end
@@ -155,7 +196,12 @@ defmodule Backend.ProductTest do
     end
 
     test "is case sensitive", %{} do
-      {:ok, _} = Repo.insert(%Product{name: "case_test", description: "Case Test", price: Decimal.new("75.99")})
+      {:ok, _} =
+        Repo.insert(%Product{
+          name: "case_test",
+          description: "Case Test",
+          price: Decimal.new("75.99")
+        })
 
       # Should not match different case
       products = Products.get_products_by_names(["Case_Test", "CASE_TEST"])
@@ -170,7 +216,11 @@ defmodule Backend.ProductTest do
   describe "get_product_by_name/1" do
     setup do
       {:ok, product} =
-        Repo.insert(%Product{name: "unique_product", description: "Unique Product", price: Decimal.new("99.99")})
+        Repo.insert(%Product{
+          name: "unique_product",
+          description: "Unique Product",
+          price: Decimal.new("99.99")
+        })
 
       %{product: product}
     end
@@ -195,7 +245,12 @@ defmodule Backend.ProductTest do
     # If you need to handle nil, add validation in the Products context
 
     test "is case sensitive" do
-      {:ok, _} = Repo.insert(%Product{name: "casesensitive", description: "Test", price: Decimal.new("10.00")})
+      {:ok, _} =
+        Repo.insert(%Product{
+          name: "casesensitive",
+          description: "Test",
+          price: Decimal.new("10.00")
+        })
 
       assert Products.get_product_by_name("casesensitive") != nil
       assert Products.get_product_by_name("CaseSensitive") == nil
@@ -212,7 +267,8 @@ defmodule Backend.ProductTest do
       }
 
       assert {:ok, product} = Products.create_product(attrs)
-      assert is_binary(product.id)  # UUID is generated
+      # UUID is generated
+      assert is_binary(product.id)
       assert product.name == "new_product"
       assert product.description == "New Product"
       assert product.price == Decimal.new("25.99")

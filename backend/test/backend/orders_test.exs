@@ -16,13 +16,25 @@ defmodule Backend.OrdersTest do
       })
 
     {:ok, product1} =
-      Repo.insert(%Product{name: "product1", description: "Product 1", price: Decimal.new("10.00")})
+      Repo.insert(%Product{
+        name: "product1",
+        description: "Product 1",
+        price: Decimal.new("10.00")
+      })
 
     {:ok, product2} =
-      Repo.insert(%Product{name: "product2", description: "Product 2", price: Decimal.new("20.00")})
+      Repo.insert(%Product{
+        name: "product2",
+        description: "Product 2",
+        price: Decimal.new("20.00")
+      })
 
     {:ok, product3} =
-      Repo.insert(%Product{name: "product3", description: "Product 3", price: Decimal.new("15.00")})
+      Repo.insert(%Product{
+        name: "product3",
+        description: "Product 3",
+        price: Decimal.new("15.00")
+      })
 
     %{user: user, product1: product1, product2: product2, product3: product3}
   end

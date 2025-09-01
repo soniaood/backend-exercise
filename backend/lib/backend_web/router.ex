@@ -22,7 +22,9 @@ defmodule BackendWeb.Router do
 
   defp ensure_v1_header(conn, _opts) do
     case get_req_header(conn, "api-version") do
-      ["v1"] -> conn
+      ["v1"] ->
+        conn
+
       _ ->
         conn
         |> put_status(:bad_request)

@@ -41,8 +41,8 @@ defmodule BackendWeb.AuthControllerTest do
       assert is_map(details)
       # Should have validation errors
       assert Map.has_key?(details, "username") or
-             Map.has_key?(details, "email") or
-             Map.has_key?(details, "password")
+               Map.has_key?(details, "email") or
+               Map.has_key?(details, "password")
     end
 
     test "returns error for duplicate username", %{conn: conn} do
@@ -109,7 +109,8 @@ defmodule BackendWeb.AuthControllerTest do
 
       # Create some products
       products = create_test_products()
-      [netflix | _] = products  # Pattern match to get first product
+      # Pattern match to get first product
+      [netflix | _] = products
 
       # Create a proper order first
       {:ok, %{order: _order}} = Backend.Orders.create_order(user.id, [netflix.id])

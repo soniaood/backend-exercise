@@ -65,9 +65,14 @@ defmodule BackendWeb.UserControllerTest do
              } = json_response(conn, 200)
 
       # Should have both product UUIDs
-      assert length(product_ids) >= 2, "Expected at least 2 products, got: #{inspect(product_ids)}"
-      assert netflix.id in product_ids, "Netflix ID #{netflix.id} not found in #{inspect(product_ids)}"
-      assert spotify.id in product_ids, "Spotify ID #{spotify.id} not found in #{inspect(product_ids)}"
+      assert length(product_ids) >= 2,
+             "Expected at least 2 products, got: #{inspect(product_ids)}"
+
+      assert netflix.id in product_ids,
+             "Netflix ID #{netflix.id} not found in #{inspect(product_ids)}"
+
+      assert spotify.id in product_ids,
+             "Spotify ID #{spotify.id} not found in #{inspect(product_ids)}"
     end
 
     test "returns error for missing token", %{conn: conn} do
@@ -177,7 +182,11 @@ defmodule BackendWeb.UserControllerTest do
              } = json_response(conn, 200)
 
       # Balance should be reduced - it's a string representation
-      balance_decimal = if is_binary(updated_balance), do: Decimal.new(updated_balance), else: Decimal.new("#{updated_balance}")
+      balance_decimal =
+        if is_binary(updated_balance),
+          do: Decimal.new(updated_balance),
+          else: Decimal.new("#{updated_balance}")
+
       assert Decimal.compare(balance_decimal, Decimal.new("1000.00")) == :lt
 
       # Should have netflix UUID, not name (legacy endpoint still returns UUIDs in product_ids)
@@ -195,7 +204,8 @@ defmodule BackendWeb.UserControllerTest do
       # Buy multiple items via legacy endpoint
       order_params1 = %{
         "order" => %{
-          "items" => ["netflix"],  # 75.99
+          # 75.99
+          "items" => ["netflix"],
           "user_id" => "buyeruser"
         }
       }
@@ -204,7 +214,8 @@ defmodule BackendWeb.UserControllerTest do
 
       order_params2 = %{
         "order" => %{
-          "items" => ["spotify"],  # 45.99
+          # 45.99
+          "items" => ["spotify"],
           "user_id" => "buyeruser"
         }
       }
@@ -224,7 +235,11 @@ defmodule BackendWeb.UserControllerTest do
              } = json_response(conn, 200)
 
       # Balance should be 1000 - 75.99 - 45.99 = 878.02
-      balance_decimal = if is_binary(final_balance), do: Decimal.new(final_balance), else: Decimal.new("#{final_balance}")
+      balance_decimal =
+        if is_binary(final_balance),
+          do: Decimal.new(final_balance),
+          else: Decimal.new("#{final_balance}")
+
       expected_balance = Decimal.sub(Decimal.new("1000.00"), Decimal.new("121.98"))
       assert Decimal.equal?(balance_decimal, expected_balance)
 
@@ -353,6 +368,7 @@ defmodule BackendWeb.UserControllerTest do
           %Product{}
           |> Product.changeset(attrs)
           |> Repo.insert!()
+
         existing_product ->
           existing_product
       end

@@ -39,6 +39,7 @@ defmodule Backend.Products do
   """
   def get_product_by_name(nil), do: nil
   def get_product_by_name(""), do: nil
+
   def get_product_by_name(product_name) when is_binary(product_name) do
     Repo.get_by(Product, name: product_name)
   end
