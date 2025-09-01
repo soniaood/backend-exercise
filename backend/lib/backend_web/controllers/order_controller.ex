@@ -25,43 +25,50 @@ defmodule BackendWeb.OrderController do
   def create_prototype(conn, %{"order" => %{"items" => items, "user_id" => username}}) do
     conn = put_resp_header(conn, "x-deprecated", "Use POST /api/orders with authentication")
 
-    # In legacy API, user_id is actually the username - need to get the actual user ID
-    case Users.get_user_by_username(username) do
-      {:ok, user} ->
-        # Convert product names to UUIDs for the Orders context
-        products = Products.get_products_by_names(items)
-        if length(products) != length(items) do
-          handle_order_error(conn, :products_not_found)
-        else
-          product_ids = Enum.map(products, & &1.id)
-          
-          case Orders.create_order(user.id, product_ids) do
-            {:ok, %{order: order, validate_balance: {products, _total}}} ->
-              response = %{
-                order: %{
-                  order_id: order.id,
-                  data: %{
-                    items: format_products_prototype(products),
-                    total: order.total
-                  }
-                }
-              }
+    with {:ok, user} <- Users.get_user_by_username(username),
+         {:ok, product_ids} <- validate_and_convert_product_names(items) do
+      
+      case Orders.create_order(user.id, product_ids) do
+        {:ok, %{order: order, validate_balance: {products, _total}}} ->
+          render_prototype_order_success(conn, order, products)
 
-              json(conn, response)
-
-            {:error, _step, reason, _changes} ->
-              handle_order_error(conn, reason)
-          end
-        end
-
+        {:error, _step, reason, _changes} ->
+          handle_order_error(conn, reason)
+      end
+    else
       {:error, :user_not_found} ->
-        conn
-        |> put_status(:bad_request)
-        |> json(%{
-          error: "user_not_found", 
-          message: "User not found"
-        })
+        handle_order_error(conn, :user_not_found)
+      
+      {:error, :products_not_found} ->
+        handle_order_error(conn, :products_not_found)
     end
+  end
+
+  defp validate_and_convert_product_names(items) do
+    products = Products.get_products_by_names(items)
+    found_names = Enum.map(products, & &1.name) |> MapSet.new()
+    requested_names = MapSet.new(items)
+    
+    if MapSet.equal?(found_names, requested_names) do
+      product_ids = Enum.map(products, & &1.id)
+      {:ok, product_ids}
+    else
+      {:error, :products_not_found}
+    end
+  end
+
+  defp render_prototype_order_success(conn, order, products) do
+    response = %{
+      order: %{
+        order_id: order.id,
+        data: %{
+          items: format_products_prototype(products),
+          total: order.total
+        }
+      }
+    }
+
+    json(conn, response)
   end
 
   defp format_products_prototype(products) do
@@ -133,6 +140,14 @@ defmodule BackendWeb.OrderController do
         |> json(%{
           error: "insufficient_balance",
           message: "User balance is insufficient for this order"
+        })
+
+      :user_not_found ->
+        conn
+        |> put_status(:bad_request)
+        |> json(%{
+          error: "user_not_found", 
+          message: "User not found"
         })
 
       _ ->

@@ -1,64 +1,65 @@
 # Benefits Management Backend API
 
-A Phoenix/Elixir backend API for an application providing user register and authentication, product (benefits) fetching, and order (benefit purchases) management capabilities.
+A Phoenix/Elixir backend API for an application providing user register and authentication, product (benefits) fetching, and order (benefit purchases) management capabilities. It could be iterated upon further.
 
 ## The Challenge
 
-This project started with a simple requirement: build an API for an existing React frontend prototype. However, the prototype had several limitations that made it unsuitable for production:
+The challenge required building an API for an existing React frontend prototype with these specifications:
 
+**Requirements:**
+- Retrieve data from a single user (indexed by username)
+- Retrieve a collection of products (with unique ID, price, name)
+- Place orders with balance validation and duplicate purchase prevention
+- Support these endpoints:
+  - `GET /api/users/:user_id` - Returns/creates user
+  - `GET /api/products` - Returns product list
+  - `POST /api/orders` - Creates orders
+
+**Limitations:**
 - **No authentication** - any user could access any data
 - **Username-based identification** - insecure and inflexible
 - **Limited error handling** - basic success/failure responses
 - **Inconsistent data formats** - product names used as IDs
 - **REST inconsistency** - GET endpoints used for creating data
 
-Rather than forcing the frontend to change immediately, this project aims to provide a solid foundation for future development while maintaining compatibility with the existing prototype.
+## Upgraded API Version
 
-## The Solution: Prototype Compatibility + Improved v1 API
+This API addresses the limitations while still maintaining backwards compatibility for the Frontend prototype.
 
 ### API Strategy Overview
 
 ```mermaid
 graph LR
-    Frontend[React Frontend<br/>Prototype] -->|/api/*| Legacy[Legacy API<br/>No Auth Required]
-    Mobile[Mobile App<br/>Future] -->|/api/v1/*| Modern[Modern API<br/>JWT Required]
-    WebApp[Web App<br/>New] -->|/api/v1/*| Modern
+    Frontend[React Frontend<br/>Prototype] -->|/api/*| Legacy[Legacy API<br/>Compatible]
+    NewClient[New Client] -->|/api/v1/*| Enhanced[Enhanced API<br/>JWT Auth]
     
-    Legacy --> Controllers[Shared Controllers]
-    Modern --> Controllers
-    Controllers --> Contexts[Business Logic<br/>Contexts]
+    Legacy --> Controllers[Controllers Layer<br/>- UserController<br/>- ProductController<br/>- OrderController<br/>- AuthController]
+    Enhanced --> Controllers
+    Controllers --> Contexts[Business Logic<br/>- Backend.Users<br/>- Backend.Products<br/>- Backend.Orders]
     Contexts --> DB[(PostgreSQL<br/>Database)]
     
-    subgraph "Dual API Design"
-        Legacy
-        Modern
-    end
-    
     style Legacy fill:#ffeb3b
-    style Modern fill:#4caf50
+    style Enhanced fill:#4caf50
     style Contexts fill:#2196f3
 ```
 
-### Legacy Prototype API (`/api/*`)
-Maintains 100% compatibility with the existing frontend:
-```http
+### Frontend Prototype API (`/api/*`)
+```
 GET /api/users/john_doe          # No auth required, creates user if missing
 GET /api/products                # Returns products with names as IDs  
 POST /api/orders                 # Uses product names, not UUIDs
 ```
 
-### Improved Production API (`/api/v1/*`)
-Designed for security, scalability, and best practices:
-```http
+### New Endpoints (`/api/v1/*`)
+```
+POST /api/v1/auth/register       # User registration
 POST /api/v1/auth/login          # JWT authentication
-GET /api/v1/products             # Proper UUID-based identification
-POST /api/v1/orders              # Authenticated, atomic transactions
-Authorization: Bearer <token>
+GET /api/v1/products             # UUID-based products
+GET /api/v1/users/me             # User fetching
+POST /api/v1/orders              # Authenticated orders
 ```
 
 ## Key Assumptions
-
-Understanding the constraints that shaped this design:
 
 **Business Logic**
 - Single currency (EUR) with 2 decimal precision for financial accuracy
@@ -74,18 +75,18 @@ Understanding the constraints that shaped this design:
 
 ## Core Features
 
-### 🔐 **Dual Authentication Model**
+### **Dual Authentication Model**
 - **Legacy endpoints**: Open access for prototype compatibility
 - **V1 endpoints**: JWT-based authentication with bcrypt password hashing
 - **User management**: Registration, login, and secure session handling
 
-### 💰 **Robust Order Processing**
+### **Robust Order Processing**
 - **Atomic transactions**: All-or-nothing order processing using `Ecto.Multi`
 - **Balance validation**: Prevents overdrafts
 - **Duplicate prevention**: Users can't buy the same product twice
 - **Automatic rollback**: Database consistency guaranteed on failures
 
-### 📊 **Smart Data Design**
+### **Smart Data Design**
 - **UUID primary keys**: Security and scalability
 - **Decimal precision**: Accurate financial calculations
 - **Foreign key constraints**: Data integrity at the database level
@@ -93,105 +94,57 @@ Understanding the constraints that shaped this design:
 
 ## Quick Start
 
+### Requirements
+- **Elixir** 1.15+
+- **Erlang/OTP** 26+
+- **PostgreSQL** 13+
+- **Docker** (for development)
+
+### Development Setup
 ```bash
-# Database setup
+# Clone and navigate to backend
+git clone <repo-url>
+cd backend-exercise-master/backend
+
+# Database setup (PostgreSQL via Docker)
 docker-compose up -d
-mix setup
 
-# Start the server
+# Install dependencies and setup database with migrations and seeds
+mix mix.setup
+
+# Start the Phoenix server
 mix phx.server
-
-# Visit http://localhost:4000
 ```
 
+### API Endpoints
 The API will be available at:
 - **Legacy**: `http://localhost:4000/api/*` (for existing frontend)
-- **Modern**: `http://localhost:4000/api/v1/*` (for new applications)
+- **Enhanced**: `http://localhost:4000/api/v1/*` (for new applications)
 
-## API Examples
-
-### Legacy Frontend Support
+### Testing
 ```bash
-# Get user (creates if doesn't exist)
-curl http://localhost:4000/api/users/john_doe
-
-# Place order using product names
-curl -X POST http://localhost:4000/api/orders \
-  -H "Content-Type: application/json" \
-  -d '{"order": {"items": ["netflix", "spotify"], "user_id": "john_doe"}}'
+# Run all tests
+mix test
 ```
 
-### Improved Secure API
+### HTTP File Testing
+For manual API testing, use the provided HTTP file `api_test.http`:
+
 ```bash
-# Register and get JWT token
-curl -X POST http://localhost:4000/api/v1/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"username": "john_doe", "email": "john@example.com", "password": "SecurePass123!"}'
+# Using IntelliJ IDEA / WebStorm HTTP Client
 
-# Place authenticated order using product ids
-curl -X POST http://localhost:4000/api/v1/orders \
-  -H "Authorization: Bearer <token>" \
-  -H "Content-Type: application/json" \
-  -d '{"items": ["550e8400-e29b-41d4-a716-446655440000"]}'
-```
-
-## Architecture Highlights
-
-### System Overview
-
-```mermaid
-graph TB
-    Client[Frontend Client]
-    Router[Phoenix Router] 
-    Auth[Authentication Layer]
-    Controllers[Controllers]
-    Contexts[Business Logic Contexts]
-    Database[(PostgreSQL)]
-    
-    Client -->|HTTP/JSON| Router
-    Router --> Auth
-    Auth --> Controllers
-    Controllers --> Contexts
-    Contexts --> Database
-    
-    subgraph "Phoenix Application"
-        Router
-        Auth
-        Controllers
-        Contexts
-    end
-    
-    subgraph "Controllers Layer"
-        AuthController[Auth Controller]
-        ProductController[Product Controller]
-        OrderController[Order Controller] 
-        UserController[User Controller]
-    end
-    
-    subgraph "Business Contexts"
-        BackendUsers[Backend.Users]
-        BackendProducts[Backend.Products]
-        BackendOrders[Backend.Orders]
-    end
-    
-    Controllers --> AuthController
-    Controllers --> ProductController
-    Controllers --> OrderController
-    Controllers --> UserController
-    
-    Contexts --> BackendUsers
-    Contexts --> BackendProducts
-    Contexts --> BackendOrders
-    
-    BackendUsers --> Database
-    BackendProducts --> Database
-    BackendOrders --> Database
+# 1. User registration
+# 2. User login  
+# 3. Product listing
+# 4. User profile fetching
+# 5. Order creation
+# 6. Token refresh
+# 7. User logout
 ```
 
 ### Transaction Safety
-### Order Transaction Flow
 
-The atomic order processing ensures data consistency:
+The atomic order processing uses `Ecto.Multi` to ensure data consistency:
 
 ```mermaid
 sequenceDiagram
@@ -204,15 +157,15 @@ sequenceDiagram
     OrderController->>BackendOrders: create_order(user_id, product_ids)
     
     BackendOrders->>Database: BEGIN TRANSACTION
-    BackendOrders->>Database: 1. Validate input
-    BackendOrders->>Database: 2. Fetch user with products
-    BackendOrders->>Database: 3. Validate products exist
-    BackendOrders->>BackendOrders: 4. Check no duplicate purchases
-    BackendOrders->>BackendOrders: 5. Validate sufficient balance
-    BackendOrders->>Database: 6. Create order record
-    BackendOrders->>Database: 7. Insert order items
-    BackendOrders->>Database: 8. Record user ownership
-    BackendOrders->>Database: 9. Update user balance
+    BackendOrders->>BackendOrders: 1. validate_input
+    BackendOrders->>Database: 2. user (fetch with products)
+    BackendOrders->>Database: 3. products (validate exist)
+    BackendOrders->>BackendOrders: 4. validate_products (check user existing products)
+    BackendOrders->>BackendOrders: 5. validate_balance (sufficient funds)
+    BackendOrders->>Database: 6. order (create record)
+    BackendOrders->>Database: 7. order_items (insert items)
+    BackendOrders->>Database: 8. user_products (record user products)
+    BackendOrders->>Database: 9. update_balance (deduct funds)
     BackendOrders->>Database: COMMIT TRANSACTION
     
     BackendOrders-->>OrderController: {:ok, order_data}
@@ -223,27 +176,22 @@ sequenceDiagram
 
 This multi-step transaction ensures that either all operations succeed or none do - preventing partial orders or inconsistent balances.
 
-### Security Layers
-- **Password hashing**: bcrypt with secure salts
-- **JWT tokens**: Stateless authentication for scalability
-- **SQL injection prevention**: Parameterized queries throughout
-- **Input validation**: Multiple validation layers (changeset, context, controller)
-
-### Performance Considerations
-- **Database connection pooling**: Efficient resource usage
-- **Preloaded associations**: Optimized query patterns
-- **UUID indexing**: Fast lookups without exposing sequential IDs
 
 ## Data Model
 
-The system tracks five main entities with clear relationships:
-
 ```mermaid
 erDiagram
+    User ||--o{ Order : places
+    User ||--o{ UserProduct : owns
+    Order ||--o{ OrderItem : contains
+    Order ||--o{ UserProduct : creates
+    Product ||--o{ OrderItem : referenced_in
+    Product ||--o{ UserProduct : owned_via
+    
     User {
         uuid id PK
         string username UK
-        string email UK
+        string email UK  
         string password_hash
         decimal balance
         datetime inserted_at
@@ -284,13 +232,6 @@ erDiagram
         datetime inserted_at
         datetime updated_at
     }
-    
-    User ||--o{ Order : "places"
-    Order ||--o{ OrderItem : "contains" 
-    OrderItem }o--|| Product : "references"
-    User ||--o{ UserProduct : "owns"
-    Product ||--o{ UserProduct : "owned_by"
-    Order ||--o{ UserProduct : "created_from"
 ```
 
 Key relationships:
@@ -298,64 +239,3 @@ Key relationships:
 - **Orders** contain multiple products and belong to one user
 - **Products** have pricing and can appear in multiple orders
 - **UserProducts** tracks ownership to prevent duplicate purchases
-
-## Why This Approach?
-
-**Backward Compatibility**: The legacy API keeps existing code working while new features get built on solid foundations.
-
-**Security Evolution**: Authentication can be added progressively without breaking existing integrations.
-
-**Future-Proof**: The v1 API follows REST conventions and can evolve with versioning strategies.
-
-**Migration Path**: Teams can migrate endpoint by endpoint rather than requiring a big-bang rewrite.
-
-## Testing
-
-```bash
-mix test              # Run all tests
-mix test --cover      # With coverage report
-```
-
-Tests cover both API versions, ensuring legacy compatibility doesn't break as new features are added.
-
-## Environment Configuration
-
-The API adapts to different environments:
-- **Development**: Includes seed data and debugging tools
-- **Test**: Isolated database with no seed data
-- **Production**: Optimized settings and security headers
-
-## Common Error Codes
-
-Both APIs return consistent error formats:
-
-| Code | Description | HTTP Status |
-|------|-------------|-------------|
-| `products_not_found` | One or more products don't exist | 400 |
-| `products_already_purchased` | User already owns these products | 400 |
-| `insufficient_balance` | Not enough funds for purchase | 400 |
-| `invalid_credentials` | Login failed | 401 |
-| `unauthenticated` | JWT token required | 401 |
-
-## Requirements
-
-- **Elixir** 1.15+
-- **Erlang/OTP** 26+
-- **PostgreSQL** 13+
-- **Docker** (for local development)
-
-## Project Structure
-
-```
-lib/
-├── backend/           # Business logic contexts
-│   ├── users.ex      # User management
-│   ├── products.ex   # Product catalog  
-│   └── orders.ex     # Order processing
-├── backend_web/       # Web layer
-│   ├── controllers/  # API endpoints
-│   └── router.ex     # Route definitions
-└── backend_web.ex    # Web configuration
-```
-
-The codebase separates business logic (contexts) from web concerns (controllers), making it easy to add new interfaces or change API formats without affecting core functionality.

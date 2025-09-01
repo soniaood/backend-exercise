@@ -33,90 +33,164 @@ defmodule Backend.Orders do
 
   def create_order(user_id, product_ids) do
     Multi.new()
-    |> Multi.run(:validate_input, fn _repo, _changes ->
-      cond do
-        is_nil(product_ids) or product_ids == [] ->
-          {:error, :empty_product_list}
-
-        !is_list(product_ids) ->
-          {:error, :invalid_product_list}
-
-        length(product_ids) != length(Enum.uniq(product_ids)) ->
-          {:error, :duplicate_products_in_request}
-
-        true ->
-          {:ok, product_ids}
-      end
-    end)
-    |> Multi.run(:user, fn _repo, _changes ->
-      case Users.get_user_with_products(user_id) do
-        %Backend.Users.User{} = user -> {:ok, user}
-        nil -> {:error, :user_not_found}
-      end
-    end)
-    |> Multi.run(:products, fn _repo, _changes ->
-      products = Products.get_products_by_ids(product_ids)
-
-      if length(products) != length(product_ids) do
-        {:error, :products_not_found}
-      else
-        {:ok, products}
-      end
-    end)
-    |> Multi.run(:validate_products, fn _repo, %{user: user, products: products} ->
-      user_product_ids = Enum.map(user.user_products, & &1.product_id)
-      already_purchased = Enum.filter(products, fn p -> p.id in user_product_ids end)
-
-      if length(already_purchased) > 0 do
-        {:error, :products_already_purchased}
-      else
-        {:ok, products}
-      end
-    end)
-    |> Multi.run(:validate_balance, fn _repo, %{user: user, products: products} ->
-      total = products |> Enum.map(& &1.price) |> Enum.reduce(Decimal.new(0), &Decimal.add/2)
-
-      if Decimal.compare(user.balance, total) == :lt do
-        {:error, :insufficient_balance}
-      else
-        {:ok, {products, total}}
-      end
-    end)
-    |> Multi.run(:order, fn _repo, %{user: user, validate_balance: {_products, total}} ->
-      %Order{}
-      |> Order.changeset(%{user_id: user.id, total: total})
-      |> Repo.insert()
-    end)
-    |> Multi.run(:order_items, fn _repo, %{order: order, validate_balance: {products, _total}} ->
-      order_items =
-        Enum.map(products, fn product ->
-          %{
-            order_id: order.id,
-            product_id: product.id,
-            price: product.price,
-            inserted_at: NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second),
-            updated_at: NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
-          }
-        end)
-
-      {count, _} = Repo.insert_all(OrderItem, order_items)
-      {:ok, count}
-    end)
-    |> Multi.run(:user_products, fn _repo,
-                                    %{
-                                      user: user,
-                                      order: order,
-                                      validate_balance: {products, _total}
-                                    } ->
-      product_ids = Enum.map(products, & &1.id)
-      Users.add_user_products(user.id, product_ids, order.id)
-      {:ok, product_ids}
-    end)
-    |> Multi.run(:update_balance, fn _repo, %{user: user, validate_balance: {_products, total}} ->
-      new_balance = Decimal.sub(user.balance, total)
-      Users.update_user_balance(user, new_balance)
-    end)
+    |> add_input_validation_step(product_ids)
+    |> add_user_fetching_step(user_id)
+    |> add_products_fetching_step(product_ids)
+    |> add_ownership_validation_step()
+    |> add_balance_validation_step()
+    |> add_order_creation_step()
+    |> add_order_items_creation_step()
+    |> add_user_products_creation_step()
+    |> add_balance_update_step()
     |> Repo.transaction()
+  end
+
+  defp add_input_validation_step(multi, product_ids) do
+    Multi.run(multi, :validate_input, fn _repo, _changes ->
+      validate_input(product_ids)
+    end)
+  end
+
+  defp add_user_fetching_step(multi, user_id) do
+    Multi.run(multi, :user, fn _repo, _changes ->
+      fetch_user_with_products(user_id)
+    end)
+  end
+
+  defp add_products_fetching_step(multi, product_ids) do
+    Multi.run(multi, :products, fn _repo, _changes ->
+      fetch_and_validate_products(product_ids)
+    end)
+  end
+
+  defp add_ownership_validation_step(multi) do
+    Multi.run(multi, :validate_products, fn _repo, %{user: user, products: products} ->
+      validate_product_ownership(user, products)
+    end)
+  end
+
+  defp add_balance_validation_step(multi) do
+    Multi.run(multi, :validate_balance, fn _repo, %{user: user, products: products} ->
+      validate_user_balance(user, products)
+    end)
+  end
+
+  defp add_order_creation_step(multi) do
+    Multi.run(multi, :order, fn _repo, %{user: user, validate_balance: {_products, total}} ->
+      create_order_record(user.id, total)
+    end)
+  end
+
+  defp add_order_items_creation_step(multi) do
+    Multi.run(multi, :order_items, fn _repo, %{order: order, validate_balance: {products, _total}} ->
+      create_order_items(order.id, products)
+    end)
+  end
+
+  defp add_user_products_creation_step(multi) do
+    Multi.run(multi, :user_products, fn _repo, %{user: user, order: order, validate_balance: {products, _total}} ->
+      create_user_products(user.id, products, order.id)
+    end)
+  end
+
+  defp add_balance_update_step(multi) do
+    Multi.run(multi, :update_balance, fn _repo, %{user: user, validate_balance: {_products, total}} ->
+      update_user_balance(user, total)
+    end)
+  end
+
+  # Individual validation and operation functions
+  defp validate_input(product_ids) do
+    cond do
+      is_nil(product_ids) or product_ids == [] ->
+        {:error, :empty_product_list}
+      !is_list(product_ids) ->
+        {:error, :invalid_product_list}
+      product_ids != Enum.uniq(product_ids) ->
+        {:error, :duplicate_products_in_request}
+      true ->
+        {:ok, product_ids}
+    end
+  end
+
+  defp fetch_user_with_products(user_id) do
+    case Users.get_user_with_products(user_id) do
+      %Backend.Users.User{} = user -> {:ok, user}
+      nil -> {:error, :user_not_found}
+    end
+  end
+
+  defp fetch_and_validate_products(product_ids) do
+    products = Products.get_products_by_ids(product_ids)
+    found_ids = Enum.map(products, & &1.id) |> MapSet.new()
+    requested_ids = MapSet.new(product_ids)
+    
+    if MapSet.equal?(found_ids, requested_ids) do
+      {:ok, products}
+    else
+      {:error, :products_not_found}
+    end
+  end
+
+  defp validate_product_ownership(user, products) do
+    user_product_ids = Enum.map(user.user_products, & &1.product_id)
+    already_purchased = Enum.filter(products, fn p -> p.id in user_product_ids end)
+
+    if Enum.empty?(already_purchased) do
+      {:ok, products}
+    else
+      {:error, :products_already_purchased}
+    end
+  end
+
+  defp validate_user_balance(user, products) do
+    total = calculate_total_price(products)
+    
+    if Decimal.compare(user.balance, total) != :lt do
+      {:ok, {products, total}}
+    else
+      {:error, :insufficient_balance}
+    end
+  end
+
+  defp create_order_record(user_id, total) do
+    %Order{}
+    |> Order.changeset(%{user_id: user_id, total: total})
+    |> Repo.insert()
+  end
+
+  defp create_order_items(order_id, products) do
+    timestamp = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
+    
+    order_items = Enum.map(products, fn product ->
+      %{
+        order_id: order_id,
+        product_id: product.id,
+        price: product.price,
+        inserted_at: timestamp,
+        updated_at: timestamp
+      }
+    end)
+
+    {count, _} = Repo.insert_all(OrderItem, order_items)
+    {:ok, count}
+  end
+
+  defp create_user_products(user_id, products, order_id) do
+    product_ids = Enum.map(products, & &1.id)
+    Users.add_user_products(user_id, product_ids, order_id)
+    {:ok, product_ids}
+  end
+
+  defp update_user_balance(user, total) do
+    new_balance = Decimal.sub(user.balance, total)
+    Users.update_user_balance(user, new_balance)
+  end
+
+  defp calculate_total_price(products) do
+    products
+    |> Enum.map(& &1.price)
+    |> Enum.reduce(Decimal.new(0), &Decimal.add/2)
   end
 
   def get_order_with_items(order_id) do
