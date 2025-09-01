@@ -73,37 +73,19 @@ erDiagram
     User ||--o{ Order : places
     User ||--o{ UserProduct : owns
     Order ||--o{ OrderItem : contains
-    Order ||--o{ UserProduct : creates
     Product ||--o{ OrderItem : referenced_in
     Product ||--o{ UserProduct : owned_via
-    
+
     User {
         uuid id PK
         string username UK
-        string email UK  
+        string email UK
         string password_hash
         decimal balance
         datetime inserted_at
         datetime updated_at
     }
-    
-    Order {
-        uuid id PK
-        uuid user_id FK
-        decimal total
-        datetime inserted_at
-        datetime updated_at
-    }
-    
-    OrderItem {
-        uuid id PK
-        uuid order_id FK
-        uuid product_id FK
-        decimal price
-        datetime inserted_at
-        datetime updated_at
-    }
-    
+
     Product {
         uuid id PK
         string name UK
@@ -112,7 +94,24 @@ erDiagram
         datetime inserted_at
         datetime updated_at
     }
-    
+
+    Order {
+        uuid id PK
+        uuid user_id FK
+        decimal total
+        datetime inserted_at
+        datetime updated_at
+    }
+
+    OrderItem {
+        uuid id PK
+        uuid order_id FK
+        uuid product_id FK
+        decimal price
+        datetime inserted_at
+        datetime updated_at
+    }
+
     UserProduct {
         uuid id PK
         uuid user_id FK
